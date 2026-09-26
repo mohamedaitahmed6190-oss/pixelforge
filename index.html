@@ -108,12 +108,12 @@ tailwind.config = { theme: { extend: {
       <div>
         <label class="text-xs font-bold uppercase tracking-wide text-mist">Style</label>
         <select id="style" class="mt-1.5">
-          <option value="retro vintage illustration, muted colors, distressed texture">Retro vintage</option>
-          <option value="minimalist line art, single color, clean vector style">Minimal line art</option>
-          <option value="bold flat vector illustration, vibrant colors, kawaii style">Cute kawaii</option>
-          <option value="gothic dark art, high contrast, intricate details">Dark / gothic</option>
-          <option value="hand-lettered typography design, decorative script">Typography</option>
-          <option value="y2k aesthetic, chrome and gradient, futuristic">Y2K futuristic</option>
+          <option value="fine art digital painting, painterly brushwork, rich detail, gallery quality illustration">Fine art painterly</option>
+          <option value="detailed ink and watercolor illustration, artistic linework, textured washes">Ink & watercolor</option>
+          <option value="realistic digital illustration, dramatic lighting, fine detail, professional concept art style">Realistic illustration</option>
+          <option value="classic engraving style illustration, fine crosshatching, intricate linework">Engraving style</option>
+          <option value="elegant hand-lettered typography design, decorative script, fine art finish">Typography</option>
+          <option value="surreal fine art illustration, dreamlike atmosphere, painterly detail">Surreal fine art</option>
         </select>
       </div>
       <div class="md:col-span-2">
@@ -163,8 +163,10 @@ function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
   const idea = $('#idea').value.trim() || 'funny cat coffee lover';
   return `Create a print-on-demand ${product}. Theme: ${idea}. Style: ${style}. ` +
-    `Requirements: high contrast, no watermark, no text artifacts, clean edges suitable for printing, ` +
-    `professional merchandise quality. Square 1:1 composition.`;
+    `Requirements: high contrast, no watermark, no text artifacts, clean crisp edges, ` +
+    `subject isolated on a solid plain white background with no shadows and no background scenery, ` +
+    `professional fine art illustration quality, painterly rendering, not cartoon, not clipart, not flat vector. ` +
+    `Square 1:1 composition.`;
 }
 
 /* ---------- generation ---------- */
@@ -239,11 +241,47 @@ async function tryWorkersAI(fullPrompt, seed, box){
   }
 }
 
-function finishSlot(url, box, dl, idx, prompt){
-  box.innerHTML = `<img src="${url}" class="result-img !border-0 fade-in" alt="design">`;
+// Turns near-white pixels transparent so the exported PNG has no background.
+// Works fully client-side (canvas pixel manipulation), no external service needed.
+// Only succeeds on same-origin images (our /api/generate blob URLs); cross-origin
+// fallback provider images (Pollinations/Horde) can't be read by canvas due to CORS,
+// so those quietly keep their original (opaque) background instead of failing.
+function makeTransparent(url){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imgData.data;
+        const threshold = 235; // near-white cutoff
+        for(let i = 0; i < d.length; i += 4){
+          if(d[i] > threshold && d[i+1] > threshold && d[i+2] > threshold){
+            d[i+3] = 0;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : url), 'image/png');
+      } catch(e){
+        resolve(url); // CORS-tainted canvas — keep original image
+      }
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+
+async function finishSlot(url, box, dl, idx, prompt){
+  const finalUrl = await makeTransparent(url);
+  const checker = 'repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 16px 16px';
+  box.innerHTML = `<img src="${finalUrl}" class="result-img !border-0 fade-in" alt="design" style="background:${checker};">`;
   dl.disabled = false;
-  dl.onclick = () => download(url, idx);
-  history.unshift({ url, prompt });
+  dl.onclick = () => download(finalUrl, idx);
+  history.unshift({ url: finalUrl, prompt });
   renderHistory();
   return { ok:true };
 }
