@@ -30,7 +30,7 @@ export async function onRequestGet(context) {
   try {
     const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', {
       prompt,
-      num_steps: 4,
+     steps: 4,
       ...(seed !== undefined ? { seed } : {})
     });
 
