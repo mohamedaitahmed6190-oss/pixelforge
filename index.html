@@ -352,26 +352,47 @@ async function tryStableHorde(fullPrompt, box){
   }
 }
 
+// Print-ready export size. The design is drawn at its native resolution, scaled up
+// and centered on a transparent 5000x5500 canvas — this guarantees the exact pixel
+// dimensions POD platforms ask for. Note: this is a clean upscale (no new detail
+// invented), so very close inspection at 100% zoom will look softer than a true
+// AI upscaler (e.g. Upscayl) — but it's sharp enough for print and needs no extra app.
+const PRINT_W = 5000, PRINT_H = 5500;
+
+function loadImageEl(url){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 async function download(url, idx){
   try {
-    if(url.startsWith('data:') || url.startsWith('blob:')){
+    const img = await loadImageEl(url);
+    const canvas = document.createElement('canvas');
+    canvas.width = PRINT_W; canvas.height = PRINT_H;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    const scale = Math.min(PRINT_W / img.naturalWidth, PRINT_H / img.naturalHeight) * 0.92;
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    const x = (PRINT_W - w) / 2, y = (PRINT_H - h) / 2;
+    ctx.drawImage(img, x, y, w, h);
+    canvas.toBlob((blob) => {
+      if(!blob){ toast('Export failed — try again', true); return; }
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `pod-design-${Date.now()}-${idx+1}.png`;
+      a.href = blobUrl; a.download = `pod-design-${Date.now()}-${idx+1}-5000x5500.png`;
       document.body.appendChild(a); a.click(); a.remove();
-      return;
-    }
-    // Remote URL (Pollinations/Horde) — try a real download first, since it needs no CORS headers to display but does to save as blob
-    const r = await fetch(url, { mode:'cors' });
-    if(!r.ok) throw new Error('fetch failed');
-    const blob = await r.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl; a.download = `pod-design-${Date.now()}-${idx+1}.png`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    }, 'image/png');
   } catch(e){
-    // CORS blocked the fetch — open the image in a new tab so the person can long-press/save it manually
-    toast('Direct download blocked — opening image, long-press to save', true);
+    // Cross-origin provider image (Pollinations/Horde) — canvas can't read it, so
+    // fall back to opening the original (smaller) image for a manual long-press save.
+    toast('Could not export at 5000×5500 for this image — opening original to save manually', true);
     window.open(url, '_blank');
   }
 }
