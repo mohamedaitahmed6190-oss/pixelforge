@@ -31,9 +31,7 @@ export async function onRequestGet(context) {
     const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', {
       prompt,
      steps: 4,
-      ...(seed !== undefined ? { seed } : {})
-    });
-
+      });
     // Workers AI image models sometimes return a raw binary stream, sometimes
     // an object like { image: "<base64>" } — handle both.
     if (result && typeof result === 'object' && result.image) {
