@@ -64,12 +64,12 @@ tailwind.config = { theme: { extend: {
       Everything you need<br>to <span class="text-brand">sell.</span>
     </h1>
     <p class="mt-6 text-lg md:text-xl text-mist max-w-xl leading-relaxed">
-      100% free, no account or API key needed. The simple workspace for ready-to-sell POD designs — t-shirts, mugs, hoodies & more.
+      Free, no account or API key needed. The simple workspace for ready-to-sell POD designs — t-shirts, mugs, hoodies & more.
     </p>
     <div class="mt-9 flex flex-wrap gap-4 items-center">
       <a href="#workspace" class="btn-primary text-base">Get started <span class="ml-1">→</span></a>
     </div>
-    <p class="mt-4 text-sm text-[#8a8a94]">No sign-up · no key · no billing — completely free.</p>
+    <p class="mt-4 text-sm text-[#8a8a94]">No sign-up · no key · no billing · free daily generations.</p>
   </div>
 </section>
 
@@ -80,7 +80,7 @@ tailwind.config = { theme: { extend: {
     <p class="mt-3 text-mist max-w-lg">Stop wrestling with AI. Pick a product, pick a vibe, generate, download, upload to Printify.</p>
     <div class="mt-10 grid md:grid-cols-3 gap-5">
       <div class="card p-6"><div class="text-2xl mb-3">🎨</div><h3 class="font-bold text-lg">Pre-built prompt recipes</h3><p class="mt-2 text-sm text-mist leading-relaxed">Tuned for t-shirt graphics, mug wraps & sticker packs. Consistent style, clean compositions.</p></div>
-      <div class="card p-6"><div class="text-2xl mb-3">🆓</div><h3 class="font-bold text-lg">Completely free</h3><p class="mt-2 text-sm text-mist leading-relaxed">No account, no API key, no billing. Just open the workspace and start generating.</p></div>
+      <div class="card p-6"><div class="text-2xl mb-3">🆓</div><h3 class="font-bold text-lg">Free to use</h3><p class="mt-2 text-sm text-mist leading-relaxed">No account, no API key, no billing. Free daily generations — just open the workspace and start.</p></div>
       <div class="card p-6"><div class="text-2xl mb-3">⚡</div><h3 class="font-bold text-lg">Fast iteration</h3><p class="mt-2 text-sm text-mist leading-relaxed">Generate 2 variations at a time, download PNGs, queue the next batch in seconds.</p></div>
     </div>
   </div>
@@ -92,7 +92,6 @@ tailwind.config = { theme: { extend: {
     <h2 class="text-2xl md:text-4xl font-extrabold tracking-tight">Workspace</h2>
     <p class="mt-3 text-mist max-w-lg">Describe the design, we build the prompt — free AI art generation, no key required.</p>
 
-    <!-- CONFIG -->
     <div class="grid md:grid-cols-4 gap-4 mt-6">
       <div>
         <label class="text-xs font-bold uppercase tracking-wide text-mist">Product</label>
@@ -126,13 +125,11 @@ tailwind.config = { theme: { extend: {
 
     <div class="mt-6 flex flex-wrap items-center gap-4">
       <button id="genBtn" class="btn-primary text-base">✦ Generate 2 designs</button>
-      <span class="text-xs text-[#8a8a94]">Free AI image generation · no key, no quota, no billing</span>
+      <span class="text-xs text-[#8a8a94]">Free daily generations · no key, no billing</span>
     </div>
 
-    <!-- RESULTS -->
     <div id="results" class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4"></div>
 
-    <!-- HISTORY -->
     <div id="historyWrap" class="mt-10 hidden">
       <h3 class="font-bold text-lg">Session history</h3>
       <div id="history" class="mt-4 grid grid-cols-2 md:grid-cols-6 gap-3"></div>
@@ -141,7 +138,7 @@ tailwind.config = { theme: { extend: {
 </section>
 
 <footer class="border-t border-[#e0ebe2] py-8 text-center text-sm text-[#8a8a94]">
-  © 2026 PixelForge · 100% free · no account, no key, no billing.
+  © 2026 PixelForge · free · no account, no key, no billing.
   <br><a href="/api/generate?prompt=apple" target="_blank" class="text-brand underline">Test API endpoint</a>
 </footer>
 
@@ -190,75 +187,58 @@ $('#genBtn').onclick = async () => {
       <button class="dlBtn btn-ghost !py-2 w-full mt-3 text-sm" disabled>Download PNG</button>
       <button class="metaBtn btn-ghost !py-2 w-full mt-2 text-sm" disabled>✦ Get SEO Listing</button>
       <div class="metaBox mt-3 hidden text-xs text-left space-y-2"></div>`;
-    $('#results').prepend(d);
+    $('#results').append(d);
     slots.push(d);
   }
-  // Sequential with a short gap — parallel calls were tripping Pollinations' shared rate limit
   const results = [];
   for(let i=0;i<slots.length;i++){
     results.push(await genOne(prompt, slots[i], i, ideaVal, productLabel, styleLabel));
-    if(i < slots.length-1) await sleep(2500);
   }
-  const failed = results.filter(r => !r.ok).length;
   generating = false; btn.disabled = false; btn.innerHTML = '✦ Generate 2 designs';
-  if(failed > 0) toast(failed + ' design(s) failed — try again', true);
+  const failed = results.filter(r => !r.ok);
+  if(failed.some(r => r.limit)) toast('Daily limit reached — come back tomorrow', true);
+  else if(failed.length) toast(failed.length + ' design(s) failed — try again', true);
 };
 
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-// Free, no-key image generation.
-// Order: 1) our own /api/generate (Cloudflare Workers AI, same-origin — no CORS issues, most reliable)
-//        2) Pollinations.ai (external, no key, but occasionally overloaded)
-//        3) Hugging Face with authenticated token (same-origin via /api/generate-hf)
-//        4) DeepAI public demo key (same-origin via /api/generate-deepai)
-//        5) Stable Horde (external, no key, slower community GPU pool — last resort)
+// 1) /api/generate (Workers AI + KV cache)  2) Pollinations backup
 async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
   const box = slot.querySelector('.result-img');
   const dl = slot.querySelector('.dlBtn');
-  const seed = Date.now() + idx * 7919; // different seed per slot → different variation
+  const seed = Date.now() + idx * 7919;
   const fullPrompt = `${prompt} (variation ${idx+1}: slightly different composition/colors)`;
 
-  const wrkResult = await tryWorkersAI(fullPrompt, seed, box);
-  if(wrkResult) return finishSlot(wrkResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
+  const w = await tryWorkersAI(fullPrompt, seed, box);
+  if(w && w.url) return finishSlot(w.url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
   const pollResult = await tryPollinations(fullPrompt, seed, box);
   if(pollResult) return finishSlot(pollResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
-  const hfResult = await tryHuggingFace(fullPrompt, box);
-  if(hfResult) return finishSlot(hfResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
-
-  const deepaiResult = await tryDeepAI(fullPrompt, box);
-  if(deepaiResult) return finishSlot(deepaiResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
-
-  box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Switching provider…</span>`;
-  const hordeResult = await tryStableHorde(fullPrompt, box);
-  if(hordeResult) return finishSlot(hordeResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
-
-  box.innerHTML = `<div class="px-3 text-center"><span class="text-red-500 text-xs font-semibold">All free providers are down</span><p class="text-[11px] text-mist mt-1">Try again in a minute.</p></div>`;
-  return { ok:false };
+  const limit = !!(w && w.limit);
+  box.innerHTML = limit
+    ? `<div class="px-3 text-center"><span class="text-red-500 text-xs font-semibold">Daily limit reached</span><p class="text-[11px] text-mist mt-1">Come back tomorrow for more free designs.</p></div>`
+    : `<div class="px-3 text-center"><span class="text-red-500 text-xs font-semibold">Generator is busy</span><p class="text-[11px] text-mist mt-1">Try again in a minute.</p></div>`;
+  return { ok:false, limit };
 }
 
-// Our own Cloudflare Pages Function — same-origin, so fetch()+blob() works with no CORS issues.
-// Returns null (rather than throwing) if the Workers AI binding isn't set up yet, so the app
-// silently falls back to the external providers below.
 async function tryWorkersAI(fullPrompt, seed, box){
   try {
     box.innerHTML = `<span class="spinner !border-[#e3e3e8] !border-t-brand"></span>`;
     const r = await fetch(`/api/generate?prompt=${encodeURIComponent(fullPrompt)}&seed=${seed}`, { cache:'no-store' });
-    if(!r.ok) return null;
+    if(r.status === 429) return { limit:true };
+    if(!r.ok){
+      console.warn('Workers AI error', r.status, await r.text().catch(()=> ''));
+      return null;
+    }
     const blob = await r.blob();
     if(!blob.type.startsWith('image/') || blob.size < 500) return null;
-    return URL.createObjectURL(blob);
+    return { url: URL.createObjectURL(blob) };
   } catch(e){
     return null;
   }
 }
 
-// Turns near-white pixels transparent so the exported PNG has no background.
-// Works fully client-side (canvas pixel manipulation), no external service needed.
-// Only succeeds on same-origin images (our /api/generate blob URLs); cross-origin
-// fallback provider images (Pollinations/Horde) can't be read by canvas due to CORS,
-// so those quietly keep their original (opaque) background instead of failing.
 function makeTransparent(url){
   return new Promise((resolve) => {
     const img = new Image();
@@ -271,7 +251,7 @@ function makeTransparent(url){
         ctx.drawImage(img, 0, 0);
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const d = imgData.data;
-        const threshold = 235; // near-white cutoff
+        const threshold = 235;
         for(let i = 0; i < d.length; i += 4){
           if(d[i] > threshold && d[i+1] > threshold && d[i+2] > threshold){
             d[i+3] = 0;
@@ -280,7 +260,7 @@ function makeTransparent(url){
         ctx.putImageData(imgData, 0, 0);
         canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : url), 'image/png');
       } catch(e){
-        resolve(url); // CORS-tainted canvas — keep original image
+        resolve(url);
       }
     };
     img.onerror = () => resolve(url);
@@ -304,8 +284,6 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   return { ok:true };
 }
 
-// Load a URL as an <img> to display it — this only needs the URL to return a valid image,
-// unlike fetch()+blob() which additionally requires CORS headers the free provider may not send.
 function loadAsImage(url, timeoutMs){
   return new Promise((resolve) => {
     const img = new Image();
@@ -319,93 +297,18 @@ function loadAsImage(url, timeoutMs){
 }
 
 async function tryPollinations(fullPrompt, seed, box){
-  const models = ['flux', 'turbo', 'flux-realism'];
-  const backoff = [2500, 5000, 9000];
+  const models = ['flux', 'turbo'];
   for(let attempt=0; attempt<models.length; attempt++){
     const model = models[attempt];
     const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true&model=${model}&referrer=pixelforge-app`;
-    box.innerHTML = attempt === 0
-      ? `<span class="spinner !border-[#e3e3e8] !border-t-brand"></span>`
-      : `<span class="text-mist text-xs px-3 text-center">⏳ Server busy — trying ${model} (${attempt+1}/${models.length})…</span>`;
+    box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Trying backup generator (${attempt+1}/${models.length})…</span>`;
     const ok = await loadAsImage(imgUrl, 25000);
     if(ok) return ok;
-    if(attempt < models.length-1) await sleep(backoff[attempt]);
+    if(attempt < models.length-1) await sleep(3000);
   }
   return null;
 }
 
-// Hugging Face with authenticated token — same-origin call to our /api/generate-hf,
-// more reliable than an anonymous HF call since it's not shared-rate-limited with
-// every other anonymous visitor on the internet.
-async function tryHuggingFace(fullPrompt, box){
-  try {
-    box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Trying backup provider…</span>`;
-    const r = await fetch(`/api/generate-hf?prompt=${encodeURIComponent(fullPrompt)}`, { cache:'no-store' });
-    if(!r.ok) return null;
-    const blob = await r.blob();
-    if(!blob.type.startsWith('image/') || blob.size < 500) return null;
-    return URL.createObjectURL(blob);
-  } catch(e){
-    return null;
-  }
-}
-
-// DeepAI public demo key — no signup, but shared across all anonymous users
-// worldwide, so it can get rate-limited under heavy global traffic.
-async function tryDeepAI(fullPrompt, box){
-  try {
-    box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Trying another provider…</span>`;
-    const r = await fetch(`/api/generate-deepai?prompt=${encodeURIComponent(fullPrompt)}`, { cache:'no-store' });
-    if(!r.ok) return null;
-    const blob = await r.blob();
-    if(!blob.type.startsWith('image/') || blob.size < 500) return null;
-    return URL.createObjectURL(blob);
-  } catch(e){
-    return null;
-  }
-}
-
-// Stable Horde: free, no-key (anonymous key), community-run GPU pool — slower but a reliable backup
-async function tryStableHorde(fullPrompt, box){
-  try {
-    const submit = await fetch('https://stablehorde.net/api/v2/generate/async', {
-      method:'POST',
-      headers:{'Content-Type':'application/json', 'apikey':'0000000000', 'Client-Agent':'PixelForge:1.0'},
-      body: JSON.stringify({
-        prompt: fullPrompt,
-        params: { width:1024, height:1024, steps:20, sampler_name:'k_euler', n:1 },
-        nsfw:false, censor_nsfw:true
-      })
-    });
-    if(!submit.ok) throw new Error('horde submit failed');
-    const { id } = await submit.json();
-    if(!id) throw new Error('no job id');
-
-    for(let i=0;i<40;i++){ // poll up to ~3-4 min
-      await sleep(5000);
-      const check = await fetch(`https://stablehorde.net/api/v2/generate/check/${id}`);
-      const status = await check.json();
-      box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Backup provider queued — position ${status.queue_position ?? '?'}…</span>`;
-      if(status.done){
-        const result = await fetch(`https://stablehorde.net/api/v2/generate/status/${id}`);
-        const data = await result.json();
-        const imgSrc = data.generations?.[0]?.img;
-        if(!imgSrc) throw new Error('no image from horde');
-        return imgSrc.startsWith('http') ? imgSrc : `data:image/webp;base64,${imgSrc}`;
-      }
-      if(status.faulted) throw new Error('horde job faulted');
-    }
-    throw new Error('horde timed out');
-  } catch(e){
-    return null;
-  }
-}
-
-// Print-ready export size. The design is drawn at its native resolution, scaled up
-// and centered on a transparent 5000x5500 canvas — this guarantees the exact pixel
-// dimensions POD platforms ask for. Note: this is a clean upscale (no new detail
-// invented), so very close inspection at 100% zoom will look softer than a true
-// AI upscaler (e.g. Upscayl) — but it's sharp enough for print and needs no extra app.
 const PRINT_W = 5000, PRINT_H = 5500;
 
 function loadImageEl(url){
@@ -439,15 +342,11 @@ async function download(url, idx){
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
     }, 'image/png');
   } catch(e){
-    // Cross-origin provider image (Pollinations/Horde) — canvas can't read it, so
-    // fall back to opening the original (smaller) image for a manual long-press save.
     toast('Could not export at 5000×5500 for this image — opening original to save manually', true);
     window.open(url, '_blank');
   }
 }
 
-// SEO listing generation — calls /api/metadata (Cloudflare Workers AI text model)
-// and renders title/description/tags/keywords with per-field copy buttons.
 async function loadMetadata(slot, idea, product, style){
   const metaBtn = slot.querySelector('.metaBtn');
   const metaBox = slot.querySelector('.metaBox');
@@ -517,7 +416,7 @@ function renderHistory(){
   });
 }
 
-function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 let toastTimer;
 function toast(msg, isErr){
