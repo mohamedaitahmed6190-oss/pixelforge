@@ -6,6 +6,7 @@
 <title>PixelForge Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
 <style>
   :root{
     --paper:#F2F3F6; --surface:#FFFFFF; --ink:#16181D; --muted:#5F6570;
@@ -119,6 +120,7 @@
         <div class="field">
           <label for="style">Style</label>
           <select id="style">
+            <option value="flat vector illustration, clean geometric shapes, solid flat colors, no gradients, no texture, limited palette of 5 colors">Flat vector (best for SVG)</option>
             <option value="vintage retro badge illustration, distressed texture, limited color palette">Vintage badge</option>
             <option value="bold screen print illustration, thick outlines, 3-4 flat spot colors">Screen print</option>
             <option value="elegant hand-lettered typography design, decorative script">Typography</option>
@@ -448,6 +450,7 @@ $('#genBtn').onclick = async () => {
     d.className = 'card';
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
+      <button class="btn-sec svgBtn" disabled>Download SVG (vector)</button>
       <button class="btn-sec metaBtn" disabled>Write listing</button>
       <div class="meta"></div>`;
     $('#results').prepend(d);
@@ -541,6 +544,9 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   box.innerHTML = `<img src="${finalUrl}" alt="Generated design">`;
   dl.disabled = false;
   dl.onclick = () => download(finalUrl, idx);
+  const svgBtn = slot.querySelector('.svgBtn');
+  svgBtn.disabled = false;
+  svgBtn.onclick = () => downloadSVG(finalUrl, idx, svgBtn);
   const metaBtn = slot.querySelector('.metaBtn');
   metaBtn.disabled = false;
   metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
@@ -574,6 +580,37 @@ async function download(url, idx){
     toast('Could not export at 5000×5500 — opening original', true);
     window.open(url, '_blank');
   }
+}
+
+/* ---------- vector export (SVG) ---------- */
+async function downloadSVG(url, idx, btn){
+  if(!window.ImageTracer){ toast('Vector tool not loaded — refresh the page', true); return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Converting…';
+  await sleep(50);
+  try {
+    const img = await loadImageEl(url);
+    const size = 1024;
+    const c = document.createElement('canvas'); c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const s = Math.min(size/img.naturalWidth, size/img.naturalHeight);
+    const w = img.naturalWidth*s, h = img.naturalHeight*s;
+    ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+    const data = ctx.getImageData(0, 0, size, size);
+    let svg = ImageTracer.imagedataToSVG(data, {
+      numberofcolors: 16, colorsampling: 2, mincolorratio: 0,
+      ltres: 1, qtres: 1, pathomit: 12, blurradius: 0,
+      strokewidth: 0, roundcoords: 1, viewbox: true, desc: false
+    });
+    svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, ''); // drop transparent background
+    const u = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
+    const a = document.createElement('a');
+    a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}.svg`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 10000);
+  } catch(e){
+    toast('SVG conversion failed for this image', true);
+  }
+  btn.disabled = false; btn.textContent = 'Download SVG (vector)';
 }
 
 /* ---------- SEO listing ---------- */
