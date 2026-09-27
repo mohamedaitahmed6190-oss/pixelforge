@@ -14,24 +14,24 @@ tailwind.config = { theme: { extend: {
 }}}
 </script>
 <style>
-  body { font-family:'Inter',sans-serif; background:#fff; color:#111114; }
-  .hero-bg { background: radial-gradient(1200px 500px at 80% -10%, #e3f5e8 0%, transparent 60%), radial-gradient(900px 500px at 10% 10%, #eefaf1 0%, transparent 55%), #fff; }
-  .grid-lines { background-image: linear-gradient(#f3f3f5 1px, transparent 1px), linear-gradient(90deg, #f3f3f5 1px, transparent 1px); background-size: 56px 56px; }
-  .pill { display:inline-flex; align-items:center; gap:.5rem; border:1px solid #e8e8ec; border-radius:999px; padding:.4rem .9rem; font-size:.8rem; color:#6b6b76; background:#fff; }
+  body { font-family:'Inter',sans-serif; background:#f3f8f4; color:#111114; }
+  .hero-bg { background: radial-gradient(1200px 500px at 80% -10%, #dcf0e1 0%, transparent 60%), radial-gradient(900px 500px at 10% 10%, #e6f5ea 0%, transparent 55%), #f3f8f4; }
+  .grid-lines { background-image: linear-gradient(#e6ede7 1px, transparent 1px), linear-gradient(90deg, #e6ede7 1px, transparent 1px); background-size: 56px 56px; }
+  .pill { display:inline-flex; align-items:center; gap:.5rem; border:1px solid #dbe8dd; border-radius:999px; padding:.4rem .9rem; font-size:.8rem; color:#6b6b76; background:#fbfdfb; }
   .pill .dot { width:7px;height:7px;border-radius:999px;background:#16a34a; }
   .btn-primary { background:#16a34a; color:#fff; font-weight:700; border-radius:14px; padding:.9rem 1.6rem; transition:.2s; box-shadow:0 10px 24px -8px rgba(22,163,74,.45); }
   .btn-primary:hover { background:#15803d; transform:translateY(-1px); }
   .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-  .btn-ghost { border:1px solid #e8e8ec; color:#111114; font-weight:600; border-radius:14px; padding:.9rem 1.6rem; transition:.2s; background:#fff; }
-  .btn-ghost:hover { border-color:#c9c9d2; }
-  .card { border:1px solid #ececf1; border-radius:18px; background:#fff; transition:.2s; }
-  .card:hover { border-color:#d9d9e2; box-shadow:0 12px 30px -18px rgba(0,0,0,.15); }
-  .chip { border:1px solid #e8e8ec; border-radius:10px; padding:.45rem .8rem; font-size:.82rem; font-weight:600; cursor:pointer; transition:.15s; background:#fff; color:#3d3d46; }
+  .btn-ghost { border:1px solid #dbe8dd; color:#111114; font-weight:600; border-radius:14px; padding:.9rem 1.6rem; transition:.2s; background:#fbfdfb; }
+  .btn-ghost:hover { border-color:#b9d4bd; }
+  .card { border:1px solid #e0ebe2; border-radius:18px; background:#fbfdfb; transition:.2s; }
+  .card:hover { border-color:#c7dccb; box-shadow:0 12px 30px -18px rgba(0,0,0,.15); }
+  .chip { border:1px solid #dbe8dd; border-radius:10px; padding:.45rem .8rem; font-size:.82rem; font-weight:600; cursor:pointer; transition:.15s; background:#fbfdfb; color:#3d3d46; }
   .chip:hover { border-color:#16a34a; color:#16a34a; }
   .chip.active { background:#111114; color:#fff; border-color:#111114; }
-  select, input[type=text], input[type=password] { border:1px solid #e3e3e8; border-radius:12px; padding:.65rem .9rem; font-size:.9rem; width:100%; outline:none; transition:.15s; background:#fff; }
+  select, input[type=text], input[type=password] { border:1px solid #d7e5da; border-radius:12px; padding:.65rem .9rem; font-size:.9rem; width:100%; outline:none; transition:.15s; background:#fbfdfb; }
   select:focus, input:focus { border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,.12); }
-  .result-img { border-radius:14px; border:1px solid #ececf1; background:#fafafa; width:100%; aspect-ratio:1; object-fit:contain; }
+  .result-img { border-radius:14px; border:1px solid #e0ebe2; background:#f0f5f1; width:100%; aspect-ratio:1; object-fit:contain; }
   .fade-in { animation: fadeIn .4s ease both; }
   @keyframes fadeIn { from { opacity:0; transform:translateY(8px);} to { opacity:1; transform:none;} }
   .spinner { width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite; display:inline-block; vertical-align:-4px; }
@@ -43,7 +43,7 @@ tailwind.config = { theme: { extend: {
 <body>
 
 <!-- NAV -->
-<header class="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-[#f0f0f3]">
+<header class="sticky top-0 z-50 bg-[#f3f8f4]/85 backdrop-blur border-b border-[#e0ebe2]">
   <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
     <a href="#" class="flex items-center gap-2.5 font-extrabold text-lg tracking-tight">
       <span class="w-8 h-8 rounded-lg bg-brand grid place-items-center text-white text-sm font-black">pf</span>
@@ -69,12 +69,12 @@ tailwind.config = { theme: { extend: {
     <div class="mt-9 flex flex-wrap gap-4 items-center">
       <a href="#workspace" class="btn-primary text-base">Get started <span class="ml-1">→</span></a>
     </div>
-    <p class="mt-4 text-sm text-[#a3a3ad]">No sign-up · no key · no billing — completely free.</p>
+    <p class="mt-4 text-sm text-[#8a8a94]">No sign-up · no key · no billing — completely free.</p>
   </div>
 </section>
 
 <!-- FEATURES -->
-<section id="features" class="py-16 md:py-24 border-b border-[#f0f0f3]">
+<section id="features" class="py-16 md:py-24 border-b border-[#e0ebe2]">
   <div class="max-w-6xl mx-auto px-5">
     <h2 class="text-2xl md:text-4xl font-extrabold tracking-tight">Built for POD, not for prompts.</h2>
     <p class="mt-3 text-mist max-w-lg">Stop wrestling with AI. Pick a product, pick a vibe, generate, download, upload to Printify.</p>
@@ -87,7 +87,7 @@ tailwind.config = { theme: { extend: {
 </section>
 
 <!-- WORKSPACE -->
-<section id="workspace" class="py-16 md:py-24 bg-[#fafafb]">
+<section id="workspace" class="py-16 md:py-24 bg-[#eef4ef]">
   <div class="max-w-6xl mx-auto px-5">
     <h2 class="text-2xl md:text-4xl font-extrabold tracking-tight">Workspace</h2>
     <p class="mt-3 text-mist max-w-lg">Describe the design, we build the prompt — free AI art generation, no key required.</p>
@@ -126,7 +126,7 @@ tailwind.config = { theme: { extend: {
 
     <div class="mt-6 flex flex-wrap items-center gap-4">
       <button id="genBtn" class="btn-primary text-base">✦ Generate 2 designs</button>
-      <span class="text-xs text-[#a3a3ad]">Free AI image generation · no key, no quota, no billing</span>
+      <span class="text-xs text-[#8a8a94]">Free AI image generation · no key, no quota, no billing</span>
     </div>
 
     <!-- RESULTS -->
@@ -140,7 +140,7 @@ tailwind.config = { theme: { extend: {
   </div>
 </section>
 
-<footer class="border-t border-[#f0f0f3] py-8 text-center text-sm text-[#a3a3ad]">
+<footer class="border-t border-[#e0ebe2] py-8 text-center text-sm text-[#8a8a94]">
   © 2026 PixelForge · 100% free · no account, no key, no billing.
   <br><a href="/api/generate?prompt=apple" target="_blank" class="text-brand underline">Test API endpoint</a>
 </footer>
