@@ -59,8 +59,19 @@ export async function onRequestGet(context) {
       ]
     });
 
-    const raw = (result && typeof result.response === 'string') ? result.response : JSON.stringify(result);
-    const parsed = extractJson(raw);
+    // Newer -fast model variants sometimes return an already-parsed object in
+    // result.response (with title/description/etc. directly on it) instead of
+    // a JSON string — handle both shapes.
+    let parsed;
+    if (result && typeof result.response === 'string') {
+      parsed = extractJson(result.response);
+    } else if (result && result.response && typeof result.response === 'object') {
+      parsed = result.response;
+    } else if (result && Array.isArray(result.choices) && result.choices[0]?.message?.content) {
+      parsed = extractJson(result.choices[0].message.content);
+    } else {
+      parsed = extractJson(JSON.stringify(result));
+    }
 
     return new Response(JSON.stringify(parsed), {
       headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
