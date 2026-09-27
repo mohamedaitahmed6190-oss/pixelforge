@@ -1,39 +1,64 @@
 // Cloudflare Pages Function — /api/generate
-// Workers AI (flux-1-schnell) + KV image cache + per-IP daily limit. No R2, no card needed.
+// Workers AI with model fallback + KV image cache + per-IP daily limit.
 //
 // SETUP (Pages project → Settings → Bindings):
 //   AI → Workers AI
-//   KV → KV namespace (e.g. "pixelforge-kv")
-//
-// How the cache works: each prompt has POOL_SIZE "slots" in KV.
-// Every request picks a random slot: filled → served free (0 neurons, 0 writes);
-// empty → generate once and fill it. Pools fill up fast, then cost nothing.
-// KV free tier: 100k reads/day, 1k writes/day → each new image = 2 writes (~500/day max).
+//   KV → KV namespace ("pixelforge-kv")
 
 const POOL_SIZE = 6;     // cached images per prompt
 const DAILY_LIMIT = 20;  // new AI generations per IP per day
-const TTL = 60 * 60 * 24 * 30; // cached images live 30 days (keeps storage under 1GB)
+const TTL = 60 * 60 * 24 * 30; // cached images live 30 days
+
+// Tried in order. If one fails (quota 4006, error...), the next is used.
+const MODELS = [
+  '@cf/black-forest-labs/flux-1-schnell',
+  '@cf/bytedance/stable-diffusion-xl-lightning',
+  '@cf/lykon/dreamshaper-8-lcm',
+  '@cf/stabilityai/stable-diffusion-xl-base-1.0'
+];
 
 const json = (o, status) =>
   new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 
-const img = (body, source) =>
-  new Response(body, {
-    headers: { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-source': source }
+// Detect PNG vs JPEG from the first bytes
+const ctype = b => (b[0] === 0x89 && b[1] === 0x50) ? 'image/png' : 'image/jpeg';
+
+const img = (buf, source, model = '') => {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  return new Response(bytes, {
+    headers: {
+      'content-type': ctype(bytes),
+      'cache-control': 'no-store',
+      'x-source': source,
+      'x-model': model
+    }
   });
+};
 
 async function sha(s) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
 
-// Look for any filled slot (used when quota/limit blocks generation)
 async function anyCached(env, hash) {
   for (let i = 0; i < POOL_SIZE; i++) {
     const v = await env.KV.get(`img:${hash}:${i}`, { type: 'arrayBuffer' });
     if (v) return v;
   }
   return null;
+}
+
+// Runs one model and normalizes its output to bytes
+async function runModel(env, model, prompt) {
+  const input = model.includes('flux') ? { prompt, steps: 4 } : { prompt };
+  const r = await env.AI.run(model, input);
+  if (r && typeof r === 'object' && r.image) {
+    return Uint8Array.from(atob(r.image), c => c.charCodeAt(0));
+  }
+  if (r instanceof ReadableStream) return new Uint8Array(await new Response(r).arrayBuffer());
+  if (r instanceof ArrayBuffer) return new Uint8Array(r);
+  if (r instanceof Uint8Array) return r;
+  throw new Error('Unknown output format');
 }
 
 export async function onRequestGet(context) {
@@ -64,20 +89,24 @@ export async function onRequestGet(context) {
       : json({ error: 'daily_limit', message: 'Daily limit reached — come back tomorrow.' }, 429);
   }
 
-  // 3) Generate and fill the slot
-  try {
-    const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', { prompt, steps: 4 });
-    if (!result || !result.image) throw new Error('No image returned');
-    const bytes = Uint8Array.from(atob(result.image), c => c.charCodeAt(0));
-    waitUntil(Promise.all([
-      env.KV.put(slotKey, bytes, { expirationTtl: TTL }),
-      env.KV.put(limKey, String(used + 1), { expirationTtl: 90000 })
-    ]));
-    return img(bytes, 'ai');
-  } catch (e) {
-    // Quota exhausted / AI error → serve any cached image for this prompt
-    const c = await anyCached(env, hash);
-    if (c) return img(c, 'cache');
-    return json({ error: 'quota_or_ai_error', message: String(e.message || e) }, 503);
+  // 3) Try each model until one works
+  const errors = [];
+  for (const model of MODELS) {
+    try {
+      const bytes = await runModel(env, model, prompt);
+      if (!bytes || bytes.length < 500) throw new Error('Empty image');
+      waitUntil(Promise.all([
+        env.KV.put(slotKey, bytes, { expirationTtl: TTL }),
+        env.KV.put(limKey, String(used + 1), { expirationTtl: 90000 })
+      ]));
+      return img(bytes, 'ai', model);
+    } catch (e) {
+      errors.push(`${model.split('/').pop()}: ${String(e.message || e).slice(0, 120)}`);
+    }
   }
+
+  // 4) All models failed → serve any cached image for this prompt
+  const c = await anyCached(env, hash);
+  if (c) return img(c, 'cache');
+  return json({ error: 'quota_or_ai_error', message: errors.join(' | ') }, 503);
 }
