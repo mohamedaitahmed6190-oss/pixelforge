@@ -44,7 +44,6 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const prompt = (url.searchParams.get('prompt') || '').slice(0, 800);
   if (!prompt) return json({ error: 'Missing prompt' }, 400);
-  const seed = (parseInt(url.searchParams.get('seed') || '0', 10) || 0) % 2147483647;
 
   const hash = await sha(prompt);
   const slot = Math.floor(Math.random() * POOL_SIZE);
@@ -67,7 +66,7 @@ export async function onRequestGet(context) {
 
   // 3) Generate and fill the slot
   try {
-    const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', { prompt, steps: 4, seed });
+    const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', { prompt, steps: 4 });
     if (!result || !result.image) throw new Error('No image returned');
     const bytes = Uint8Array.from(atob(result.image), c => c.charCodeAt(0));
     waitUntil(Promise.all([
