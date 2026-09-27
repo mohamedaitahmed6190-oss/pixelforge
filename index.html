@@ -176,6 +176,9 @@ const history = [];
 $('#genBtn').onclick = async () => {
   if(generating) return;
   const prompt = buildPrompt();
+  const ideaVal = $('#idea').value.trim() || 'funny cat coffee lover';
+  const productLabel = $('#product').selectedOptions[0].text;
+  const styleLabel = $('#style').selectedOptions[0].text;
   generating = true;
   const btn = $('#genBtn'); btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Generating…';
@@ -184,14 +187,16 @@ $('#genBtn').onclick = async () => {
     const d = document.createElement('div');
     d.className = 'card p-3 fade-in';
     d.innerHTML = `<div class="result-img grid place-items-center text-mist text-sm"><span class="spinner !border-[#e3e3e8] !border-t-brand"></span></div>
-      <button class="dlBtn btn-ghost !py-2 w-full mt-3 text-sm" disabled>Download PNG</button>`;
+      <button class="dlBtn btn-ghost !py-2 w-full mt-3 text-sm" disabled>Download PNG</button>
+      <button class="metaBtn btn-ghost !py-2 w-full mt-2 text-sm" disabled>✦ Get SEO Listing</button>
+      <div class="metaBox mt-3 hidden text-xs text-left space-y-2"></div>`;
     $('#results').prepend(d);
     slots.push(d);
   }
   // Sequential with a short gap — parallel calls were tripping Pollinations' shared rate limit
   const results = [];
   for(let i=0;i<slots.length;i++){
-    results.push(await genOne(prompt, slots[i], i));
+    results.push(await genOne(prompt, slots[i], i, ideaVal, productLabel, styleLabel));
     if(i < slots.length-1) await sleep(2500);
   }
   const failed = results.filter(r => !r.ok).length;
@@ -205,21 +210,21 @@ function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 // Order: 1) our own /api/generate (Cloudflare Workers AI, same-origin — no CORS issues, most reliable)
 //        2) Pollinations.ai (external, no key, but occasionally overloaded)
 //        3) Stable Horde (external, no key, slower community GPU pool — last resort)
-async function genOne(prompt, slot, idx){
+async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
   const box = slot.querySelector('.result-img');
   const dl = slot.querySelector('.dlBtn');
   const seed = Date.now() + idx * 7919; // different seed per slot → different variation
   const fullPrompt = `${prompt} (variation ${idx+1}: slightly different composition/colors)`;
 
   const wrkResult = await tryWorkersAI(fullPrompt, seed, box);
-  if(wrkResult) return finishSlot(wrkResult, box, dl, idx, prompt);
+  if(wrkResult) return finishSlot(wrkResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
   const pollResult = await tryPollinations(fullPrompt, seed, box);
-  if(pollResult) return finishSlot(pollResult, box, dl, idx, prompt);
+  if(pollResult) return finishSlot(pollResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
   box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Switching provider…</span>`;
   const hordeResult = await tryStableHorde(fullPrompt, box);
-  if(hordeResult) return finishSlot(hordeResult, box, dl, idx, prompt);
+  if(hordeResult) return finishSlot(hordeResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
   box.innerHTML = `<div class="px-3 text-center"><span class="text-red-500 text-xs font-semibold">All free providers are down</span><p class="text-[11px] text-mist mt-1">Try again in a minute.</p></div>`;
   return { ok:false };
@@ -275,12 +280,17 @@ function makeTransparent(url){
   });
 }
 
-async function finishSlot(url, box, dl, idx, prompt){
+async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel){
   const finalUrl = await makeTransparent(url);
   const checker = 'repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 16px 16px';
   box.innerHTML = `<img src="${finalUrl}" class="result-img !border-0 fade-in" alt="design" style="background:${checker};">`;
   dl.disabled = false;
   dl.onclick = () => download(finalUrl, idx);
+  const metaBtn = slot.querySelector('.metaBtn');
+  if(metaBtn){
+    metaBtn.disabled = false;
+    metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
+  }
   history.unshift({ url: finalUrl, prompt });
   renderHistory();
   return { ok:true };
@@ -394,6 +404,63 @@ async function download(url, idx){
     // fall back to opening the original (smaller) image for a manual long-press save.
     toast('Could not export at 5000×5500 for this image — opening original to save manually', true);
     window.open(url, '_blank');
+  }
+}
+
+// SEO listing generation — calls /api/metadata (Cloudflare Workers AI text model)
+// and renders title/description/tags/keywords with per-field copy buttons.
+async function loadMetadata(slot, idea, product, style){
+  const metaBtn = slot.querySelector('.metaBtn');
+  const metaBox = slot.querySelector('.metaBox');
+  metaBtn.disabled = true;
+  metaBtn.innerHTML = '<span class="spinner !border-[#e3e3e8] !border-t-brand"></span> Writing listing…';
+  try {
+    const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    metaBox.innerHTML = renderMetadata(data);
+    metaBox.classList.remove('hidden');
+    metaBox.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
+    const copyAllBtn = metaBox.querySelector('[data-copy-all]');
+    if(copyAllBtn){
+      const allText = `${data.title||''}\n\n${data.description||''}\n\nMain tag: ${data.main_tag||''}\nTags: ${(data.supporting_tags||[]).join(', ')}\nKeywords: ${(data.seo_keywords||[]).join(', ')}`;
+      copyAllBtn.onclick = () => copyText(allText, copyAllBtn);
+    }
+    metaBtn.remove();
+  } catch(e){
+    toast('Could not generate listing — try again', true);
+    metaBtn.disabled = false;
+    metaBtn.innerHTML = '✦ Get SEO Listing';
+  }
+}
+
+function renderMetadata(d){
+  const tags = (d.supporting_tags||[]).map(t => `<span class="chip !cursor-default !py-1 !px-2">${escapeHtml(t)}</span>`).join('');
+  const kws = (d.seo_keywords||[]).map(k => `<span class="chip !cursor-default !py-1 !px-2">${escapeHtml(k)}</span>`).join('');
+  return `
+    <div class="flex items-start justify-between gap-2">
+      <p class="font-bold text-ink flex-1">${escapeHtml(d.title||'')}</p>
+      <button class="btn-ghost !py-1 !px-2 !text-[11px] shrink-0" data-copy="${escapeHtml(d.title||'')}">Copy</button>
+    </div>
+    <div class="flex items-start justify-between gap-2">
+      <p class="text-mist leading-relaxed flex-1">${escapeHtml(d.description||'')}</p>
+      <button class="btn-ghost !py-1 !px-2 !text-[11px] shrink-0" data-copy="${escapeHtml(d.description||'')}">Copy</button>
+    </div>
+    <p><span class="font-bold">Main tag:</span> ${escapeHtml(d.main_tag||'')}</p>
+    <div class="flex flex-wrap gap-1.5">${tags}</div>
+    <div class="flex flex-wrap gap-1.5">${kws}</div>
+    <button class="btn-ghost !py-1.5 w-full !text-[11px]" data-copy-all="1">Copy full listing as text</button>
+  `;
+}
+
+async function copyText(text, btn){
+  try {
+    await navigator.clipboard.writeText(text);
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch(e){
+    toast('Copy failed — select the text manually', true);
   }
 }
 
