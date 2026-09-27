@@ -52,7 +52,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fast', {
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `Product: ${product}\nArt style: ${style}\nDesign theme: ${idea}` }
