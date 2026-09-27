@@ -61,7 +61,7 @@ tailwind.config = { theme: { extend: {
   <div class="max-w-6xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28">
     <div class="pill mb-7"><span class="dot"></span> For print-on-demand sellers</div>
     <h1 class="text-4xl md:text-7xl font-black leading-[1.05] tracking-tight max-w-4xl">
-      Everything you need<br>to <span class="text-brand">sell on Etsy.</span>
+      Everything you need<br>to <span class="text-brand">sell.</span>
     </h1>
     <p class="mt-6 text-lg md:text-xl text-mist max-w-xl leading-relaxed">
       100% free, no account or API key needed. The simple workspace for ready-to-sell POD designs — t-shirts, mugs, hoodies & more.
@@ -149,9 +149,6 @@ tailwind.config = { theme: { extend: {
 const $ = s => document.querySelector(s);
 
 /* ---------- quick ideas ---------- */
-// Refreshed with 2026 trending POD/Etsy niches: cottagecore & mushroom aesthetics,
-// astrology/celestial, pet breed portraits, mental health self-care, retro travel/typography,
-// profession humor (nurse), dark academia, western/cowboy aesthetic, retro gaming, grandma-core.
 const ideas = ['funny cat coffee lover','retro sunset mountains','skull with flowers','gamer fuel energy drink','dog mom life','boho celestial moon','anime streetwear girl','van life adventure','bookish introvert','mushroom cottagecore witch','vintage retro travel poster','dog breed portrait mom','therapy is self care','zodiac celestial moon','nurse humor life','retro arcade gamer','western cowboy aesthetic','dark academia bookworm','fishing dad hobby','grandma core cottagecore'];
 const wrap = $('#quickIdeas');
 ideas.forEach(i => {
@@ -213,7 +210,8 @@ function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 // Order: 1) our own /api/generate (Cloudflare Workers AI, same-origin — no CORS issues, most reliable)
 //        2) Pollinations.ai (external, no key, but occasionally overloaded)
 //        3) Hugging Face with authenticated token (same-origin via /api/generate-hf)
-//        4) Stable Horde (external, no key, slower community GPU pool — last resort)
+//        4) DeepAI public demo key (same-origin via /api/generate-deepai)
+//        5) Stable Horde (external, no key, slower community GPU pool — last resort)
 async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
   const box = slot.querySelector('.result-img');
   const dl = slot.querySelector('.dlBtn');
@@ -228,6 +226,9 @@ async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
 
   const hfResult = await tryHuggingFace(fullPrompt, box);
   if(hfResult) return finishSlot(hfResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
+
+  const deepaiResult = await tryDeepAI(fullPrompt, box);
+  if(deepaiResult) return finishSlot(deepaiResult, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
   box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Switching provider…</span>`;
   const hordeResult = await tryStableHorde(fullPrompt, box);
@@ -340,6 +341,21 @@ async function tryHuggingFace(fullPrompt, box){
   try {
     box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Trying backup provider…</span>`;
     const r = await fetch(`/api/generate-hf?prompt=${encodeURIComponent(fullPrompt)}`, { cache:'no-store' });
+    if(!r.ok) return null;
+    const blob = await r.blob();
+    if(!blob.type.startsWith('image/') || blob.size < 500) return null;
+    return URL.createObjectURL(blob);
+  } catch(e){
+    return null;
+  }
+}
+
+// DeepAI public demo key — no signup, but shared across all anonymous users
+// worldwide, so it can get rate-limited under heavy global traffic.
+async function tryDeepAI(fullPrompt, box){
+  try {
+    box.innerHTML = `<span class="text-mist text-xs px-3 text-center">⏳ Trying another provider…</span>`;
+    const r = await fetch(`/api/generate-deepai?prompt=${encodeURIComponent(fullPrompt)}`, { cache:'no-store' });
     if(!r.ok) return null;
     const blob = await r.blob();
     if(!blob.type.startsWith('image/') || blob.size < 500) return null;
