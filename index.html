@@ -149,7 +149,10 @@ tailwind.config = { theme: { extend: {
 const $ = s => document.querySelector(s);
 
 /* ---------- quick ideas ---------- */
-const ideas = ['funny cat coffee lover','retro sunset mountains','skull with flowers','gamer fuel energy drink','dog mom life','boho celestial moon','funny gym bro','anime streetwear girl','van life adventure','bookish introvert'];
+// Refreshed with 2026 trending POD/Etsy niches: cottagecore & mushroom aesthetics,
+// astrology/celestial, pet breed portraits, mental health self-care, retro travel/typography,
+// profession humor (nurse), dark academia, western/cowboy aesthetic, retro gaming, grandma-core.
+const ideas = ['funny cat coffee lover','retro sunset mountains','skull with flowers','gamer fuel energy drink','dog mom life','boho celestial moon','anime streetwear girl','van life adventure','bookish introvert','mushroom cottagecore witch','vintage retro travel poster','dog breed portrait mom','therapy is self care','zodiac celestial moon','nurse humor life','retro arcade gamer','western cowboy aesthetic','dark academia bookworm','fishing dad hobby','grandma core cottagecore'];
 const wrap = $('#quickIdeas');
 ideas.forEach(i => {
   const b = document.createElement('button');
@@ -386,4 +389,129 @@ async function tryStableHorde(fullPrompt, box){
 // and centered on a transparent 5000x5500 canvas — this guarantees the exact pixel
 // dimensions POD platforms ask for. Note: this is a clean upscale (no new detail
 // invented), so very close inspection at 100% zoom will look softer than a true
-// AI upscaler (e.g. U
+// AI upscaler (e.g. Upscayl) — but it's sharp enough for print and needs no extra app.
+const PRINT_W = 5000, PRINT_H = 5500;
+
+function loadImageEl(url){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function download(url, idx){
+  try {
+    const img = await loadImageEl(url);
+    const canvas = document.createElement('canvas');
+    canvas.width = PRINT_W; canvas.height = PRINT_H;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    const scale = Math.min(PRINT_W / img.naturalWidth, PRINT_H / img.naturalHeight) * 0.92;
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    const x = (PRINT_W - w) / 2, y = (PRINT_H - h) / 2;
+    ctx.drawImage(img, x, y, w, h);
+    canvas.toBlob((blob) => {
+      if(!blob){ toast('Export failed — try again', true); return; }
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = `pod-design-${Date.now()}-${idx+1}-5000x5500.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    }, 'image/png');
+  } catch(e){
+    // Cross-origin provider image (Pollinations/Horde) — canvas can't read it, so
+    // fall back to opening the original (smaller) image for a manual long-press save.
+    toast('Could not export at 5000×5500 for this image — opening original to save manually', true);
+    window.open(url, '_blank');
+  }
+}
+
+// SEO listing generation — calls /api/metadata (Cloudflare Workers AI text model)
+// and renders title/description/tags/keywords with per-field copy buttons.
+async function loadMetadata(slot, idea, product, style){
+  const metaBtn = slot.querySelector('.metaBtn');
+  const metaBox = slot.querySelector('.metaBox');
+  metaBtn.disabled = true;
+  metaBtn.innerHTML = '<span class="spinner !border-[#e3e3e8] !border-t-brand"></span> Writing listing…';
+  try {
+    const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    metaBox.innerHTML = renderMetadata(data);
+    metaBox.classList.remove('hidden');
+    metaBox.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
+    const copyAllBtn = metaBox.querySelector('[data-copy-all]');
+    if(copyAllBtn){
+      const allText = `${data.title||''}\n\n${data.description||''}\n\nMain tag: ${data.main_tag||''}\nTags: ${(data.supporting_tags||[]).join(', ')}\nKeywords: ${(data.seo_keywords||[]).join(', ')}`;
+      copyAllBtn.onclick = () => copyText(allText, copyAllBtn);
+    }
+    metaBtn.remove();
+  } catch(e){
+    toast('Could not generate listing — try again', true);
+    metaBtn.disabled = false;
+    metaBtn.innerHTML = '✦ Get SEO Listing';
+  }
+}
+
+function renderMetadata(d){
+  const tags = (d.supporting_tags||[]).map(t => `<span class="chip !cursor-default !py-1 !px-2">${escapeHtml(t)}</span>`).join('');
+  const kws = (d.seo_keywords||[]).map(k => `<span class="chip !cursor-default !py-1 !px-2">${escapeHtml(k)}</span>`).join('');
+  return `
+    <div class="flex items-start justify-between gap-2">
+      <p class="font-bold text-ink flex-1">${escapeHtml(d.title||'')}</p>
+      <button class="btn-ghost !py-1 !px-2 !text-[11px] shrink-0" data-copy="${escapeHtml(d.title||'')}">Copy</button>
+    </div>
+    <div class="flex items-start justify-between gap-2">
+      <p class="text-mist leading-relaxed flex-1">${escapeHtml(d.description||'')}</p>
+      <button class="btn-ghost !py-1 !px-2 !text-[11px] shrink-0" data-copy="${escapeHtml(d.description||'')}">Copy</button>
+    </div>
+    <p><span class="font-bold">Main tag:</span> ${escapeHtml(d.main_tag||'')}</p>
+    <div class="flex flex-wrap gap-1.5">${tags}</div>
+    <div class="flex flex-wrap gap-1.5">${kws}</div>
+    <button class="btn-ghost !py-1.5 w-full !text-[11px]" data-copy-all="1">Copy full listing as text</button>
+  `;
+}
+
+async function copyText(text, btn){
+  try {
+    await navigator.clipboard.writeText(text);
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch(e){
+    toast('Copy failed — select the text manually', true);
+  }
+}
+
+function renderHistory(){
+  if(!history.length) return;
+  $('#historyWrap').classList.remove('hidden');
+  const h = $('#history'); h.innerHTML = '';
+  history.slice(0,12).forEach((it,i) => {
+    const d = document.createElement('div');
+    d.className = 'card p-2 cursor-pointer';
+    d.innerHTML = `<img src="${it.url}" class="rounded-lg aspect-square object-cover w-full">`;
+    d.title = it.prompt;
+    d.onclick = () => download(it.url, i);
+    h.appendChild(d);
+  });
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let toastTimer;
+function toast(msg, isErr){
+  clearTimeout(toastTimer);
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast' + (isErr ? ' err' : ''); t.textContent = msg;
+  document.body.appendChild(t);
+  toastTimer = setTimeout(()=>t.remove(), 3500);
+}
+</script>
+</body>
+</html>
