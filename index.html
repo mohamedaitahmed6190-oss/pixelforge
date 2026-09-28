@@ -64,6 +64,13 @@
   .btn-sec:hover:not(:disabled){border-color:var(--ink)}
   .btn-sec:disabled{opacity:.45;cursor:not-allowed}
 
+  .btn-kit{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .btn-kit:hover:not(:disabled){background:#000}
+  .kit{display:none;margin-top:8px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:#FAFBFC}
+  .kit.show{display:block}
+  .kit p{margin:0 0 4px;font-size:12.5px;color:var(--muted)}
+  .kit p strong{color:var(--ink)}
+  a.btn-sec{display:block;text-align:center;text-decoration:none;color:var(--ink)}
   .meta{font-size:12.5px;margin-top:10px;display:none}
   .meta.show{display:block}
   .meta .t{font-weight:600;font-size:13.5px}
@@ -623,6 +630,8 @@ $('#genBtn').onclick = async () => {
     d.dataset.dark = isDark() ? '1' : '';
     d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
+      <button class="btn-sec btn-kit kitBtn" disabled>🚀 TeePublic kit</button>
+      <div class="kit"></div>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
       <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
       <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
@@ -727,6 +736,9 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   const upBtn = slot.querySelector('.upBtn');
   upBtn.disabled = false;
   upBtn.onclick = () => downloadUpscaled(url, idx, upBtn, dark);
+  const kitBtn = slot.querySelector('.kitBtn');
+  kitBtn.disabled = false;
+  kitBtn.onclick = () => teepublicKit(slot, finalUrl, idx, ideaVal, productLabel, styleLabel);
   const metaBtn = slot.querySelector('.metaBtn');
   metaBtn.disabled = false;
   metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
@@ -741,7 +753,7 @@ const PRINT_W = 5000, PRINT_H = 5500;
 function loadImageEl(url){
   return new Promise((res, rej) => { const i = new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=url; });
 }
-async function download(url, idx){
+async function download(url, idx, name){
   try {
     const img = await loadImageEl(url);
     const c = document.createElement('canvas'); c.width = PRINT_W; c.height = PRINT_H;
@@ -752,7 +764,7 @@ async function download(url, idx){
     c.toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return; }
       const u = URL.createObjectURL(b), a = document.createElement('a');
-      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-5000x5500.png`;
+      a.href = u; a.download = name || `pod-design-${Date.now()}-${idx+1}-5000x5500.png`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 10000);
     }, 'image/png');
@@ -871,13 +883,19 @@ async function downloadUpscaled(originalUrl, idx, btn, dark){
 }
 
 /* ---------- SEO listing ---------- */
+async function getMeta(slot, idea, product, style){
+  if(slot._meta) return slot._meta;
+  const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&text=${encodeURIComponent(slot.dataset.text || '')}&niche=${encodeURIComponent(slot.dataset.niche || '')}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  slot._meta = d;
+  return d;
+}
 async function loadMetadata(slot, idea, product, style){
   const btn = slot.querySelector('.metaBtn'), box = slot.querySelector('.meta');
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Writing…';
   try {
-    const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&text=${encodeURIComponent(slot.dataset.text || '')}&niche=${encodeURIComponent(slot.dataset.niche || '')}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
-    const d = await r.json();
-    if(d.error) throw new Error(d.error);
+    const d = await getMeta(slot, idea, product, style);
     box.innerHTML = renderMetadata(d);
     box.classList.add('show');
     box.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
@@ -889,6 +907,40 @@ async function loadMetadata(slot, idea, product, style){
     btn.disabled = false; btn.textContent = 'Write listing';
   }
 }
+/* ---------- TeePublic kit: PNG + listing fields + upload page ---------- */
+const TEEPUBLIC_UPLOAD_URL = 'https://www.teepublic.com/design/quick_create';
+async function teepublicKit(slot, finalUrl, idx, idea, product, style){
+  const btn = slot.querySelector('.kitBtn'), panel = slot.querySelector('.kit');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Preparing kit…';
+  try {
+    const d = await getMeta(slot, idea, product, style);
+    const slug = (d.title || 'design').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'design';
+    const file = `${slug}.png`;
+    download(finalUrl, idx, file);
+    const fields = [
+      ['Title', d.title || ''],
+      ['Description', d.description || ''],
+      ['Main tag', d.main_tag || ''],
+      ['Supporting tags', (d.supporting_tags || []).join(', ')]
+    ];
+    panel.innerHTML =
+      `<p>✓ <strong>${esc(file)}</strong> downloading</p>
+       <p><strong>Title:</strong> ${esc(d.title || '')}</p>` +
+      fields.map(([k], i) => `<button class="btn-sec" data-kit="${i}">Copy ${k}</button>`).join('') +
+      `<a class="btn-sec" href="${TEEPUBLIC_UPLOAD_URL}" target="_blank" rel="noopener">Open TeePublic upload ↗</a>
+       <button class="btn-sec" data-redl="1">Download PNG again</button>`;
+    panel.classList.add('show');
+    panel.querySelectorAll('[data-kit]').forEach(b => b.onclick = () => copyText(fields[b.dataset.kit][1], b));
+    panel.querySelector('[data-redl]').onclick = () => download(finalUrl, idx, file);
+    btn.textContent = '🚀 TeePublic kit ready';
+  } catch(e){
+    console.warn(e);
+    toast('Could not prepare the kit — try again', true);
+    btn.textContent = '🚀 TeePublic kit';
+  }
+  btn.disabled = false;
+}
+
 function renderMetadata(d){
   const tags = (d.supporting_tags||[]).map(t => `<span class="tag">${esc(t)}</span>`).join('');
   const kws = (d.seo_keywords||[]).map(k => `<span class="tag">${esc(k)}</span>`).join('');
@@ -925,4 +977,4 @@ function toast(msg, err){
 }
 </script>
 </body>
-  </html>
+</html>
