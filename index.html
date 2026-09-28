@@ -156,6 +156,8 @@
         <input id="exactText" type="text" placeholder="e.g. Reel Cool Dad">
       </div>
 
+      <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
+
       <button id="genBtn" class="gen">Generate 2 designs</button>
       <p class="note">Keep text to 1–4 words for clean lettering. Always check spelling before uploading.</p>
     </aside>
@@ -384,8 +386,15 @@ const NICHES = [
     ['tow truck',''] ]}
 ];
 
-/* ---------- niche & idea selects ---------- */
+/* ---------- niche & idea selects (+ your own saved ideas) ---------- */
+const CUSTOM_KEY = 'pf_custom_ideas';
+function loadCustom(){ try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '{}'); } catch(e){ return {}; } }
+function saveCustom(o){ try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(o)); } catch(e){} }
+
 const nicheSel = $('#niche'), sugSel = $('#suggest');
+const gMine = document.createElement('optgroup'); gMine.label = 'Yours';
+const mine = document.createElement('option'); mine.value = 'mine'; mine.textContent = '✏️ My own ideas';
+gMine.appendChild(mine);
 const gHot = document.createElement('optgroup'); gHot.label = 'Trending this season';
 const gAll = document.createElement('optgroup'); gAll.label = 'Evergreen';
 NICHES.forEach((n, i) => {
@@ -393,26 +402,48 @@ NICHES.forEach((n, i) => {
   o.value = i; o.textContent = (n.hot ? '🔥 ' : '') + n.name;
   (n.hot ? gHot : gAll).appendChild(o);
 });
-nicheSel.append(gHot, gAll);
+nicheSel.append(gMine, gHot, gAll);
+nicheSel.value = '0';
 
-function fillIdeas(){
-  const n = NICHES[nicheSel.value];
+function nicheName(){ return nicheSel.value === 'mine' ? 'My own ideas' : NICHES[nicheSel.value].name; }
+function customList(){ return loadCustom()[nicheName()] || []; }
+function builtinList(){ return nicheSel.value === 'mine' ? [] : NICHES[nicheSel.value].ideas; }
+
+function fillIdeas(selectValue){
   sugSel.innerHTML = '';
-  n.ideas.forEach(([d, t], i) => {
-    const o = document.createElement('option');
-    o.value = i;
-    o.textContent = t ? `${d} — "${t}"` : `${d} (no text)`;
-    sugSel.appendChild(o);
-  });
+  const add = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sugSel.appendChild(o); };
+  add('new', '✏️ Write my own idea');
+  customList().forEach(([d, t], i) => add('c' + i, '⭐ ' + (t ? `${d} — "${t}"` : `${d} (no text)`)));
+  builtinList().forEach(([d, t], i) => add('b' + i, t ? `${d} — "${t}"` : `${d} (no text)`));
+  sugSel.value = selectValue || (sugSel.options.length > 1 ? sugSel.options[1].value : 'new');
   applyIdea();
 }
 function applyIdea(){
-  const [d, t] = NICHES[nicheSel.value].ideas[sugSel.value];
+  const v = sugSel.value;
+  if(v === 'new'){
+    $('#idea').value = ''; $('#exactText').value = '';
+    $('#idea').placeholder = 'Describe your design, e.g. bulldog wearing sunglasses';
+    $('#idea').focus();
+    return;
+  }
+  const [d, t] = (v[0] === 'c' ? customList() : builtinList())[+v.slice(1)];
   $('#idea').value = d;
   $('#exactText').value = t;
 }
-nicheSel.onchange = fillIdeas;
+nicheSel.onchange = () => fillIdeas();
 sugSel.onchange = applyIdea;
+
+$('#saveIdea').onclick = () => {
+  const d = $('#idea').value.trim(), t = $('#exactText').value.trim();
+  if(!d){ toast('Write a description first', true); $('#idea').focus(); return; }
+  const all = loadCustom(), name = nicheName();
+  const list = all[name] || [];
+  let i = list.findIndex(x => x[0] === d && x[1] === t);
+  if(i === -1){ list.unshift([d, t]); i = 0; }
+  all[name] = list; saveCustom(all);
+  fillIdeas('c' + i);
+  toast(`Saved to ${name}`);
+};
 fillIdeas();
 
 /* ---------- prompt builder ---------- */
@@ -588,7 +619,6 @@ async function downloadVectorPNG(url, idx, btn){
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
   await sleep(50);
   try {
-    // 1) trace the design into vector shapes
     const img = await loadImageEl(url);
     const size = 1024;
     const c = document.createElement('canvas'); c.width = size; c.height = size;
@@ -604,7 +634,6 @@ async function downloadVectorPNG(url, idx, btn){
     svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')
              .replace('<svg ', `<svg width="${size}" height="${size}" `);
 
-    // 2) render the vector at print size → razor-sharp PNG
     const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
     const vec = await loadImageEl(svgUrl);
     const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
