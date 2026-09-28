@@ -482,6 +482,7 @@ $('#genBtn').onclick = async () => {
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
       <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
+      <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
       <button class="btn-sec metaBtn" disabled>Write listing</button>
       <div class="meta"></div>`;
     $('#results').prepend(d);
@@ -578,6 +579,9 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   const svgBtn = slot.querySelector('.svgBtn');
   svgBtn.disabled = false;
   svgBtn.onclick = () => downloadVectorPNG(finalUrl, idx, svgBtn);
+  const upBtn = slot.querySelector('.upBtn');
+  upBtn.disabled = false;
+  upBtn.onclick = () => downloadUpscaled(url, idx, upBtn);
   const metaBtn = slot.querySelector('.metaBtn');
   metaBtn.disabled = false;
   metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
@@ -655,6 +659,72 @@ async function downloadVectorPNG(url, idx, btn){
     toast('Vectorizing failed for this image — use the normal PNG', true);
   }
   btn.disabled = false; btn.textContent = 'HD PNG (vectorized)';
+}
+
+/* ---------- AI upscale (ESRGAN in the browser, free) ---------- */
+const UPSCALE_LIBS = [
+  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js',
+  'https://cdn.jsdelivr.net/npm/@upscalerjs/default-model@1.0.0/dist/umd/index.min.js',
+  'https://cdn.jsdelivr.net/npm/upscaler@1.0.0/dist/browser/umd/upscaler.min.js',
+  'https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@1.0.0/dist/umd/models/esrgan-slim/src/x2/index.min.js'
+];
+let upscaler = null;
+function loadScript(src){
+  return new Promise((res, rej) => {
+    if(document.querySelector(`script[src="${src}"]`)) return res();
+    const sc = document.createElement('script');
+    sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('Could not load ' + src));
+    document.head.appendChild(sc);
+  });
+}
+async function getUpscaler(){
+  if(upscaler) return upscaler;
+  for(const src of UPSCALE_LIBS) await loadScript(src);
+  upscaler = new Upscaler({ model: ESRGANSlim2x });
+  return upscaler;
+}
+// originalUrl = the image BEFORE background removal (AI needs the white background)
+async function downloadUpscaled(originalUrl, idx, btn){
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Loading AI…';
+  try {
+    const up = await getUpscaler();
+    const img = await loadImageEl(originalUrl);
+    btn.innerHTML = '<span class="spin"></span> Upscaling 0%';
+    const src = await up.upscale(img, {
+      patchSize: 64, padding: 6,
+      progress: p => { btn.innerHTML = `<span class="spin"></span> Upscaling ${Math.round(p*100)}%`; }
+    });
+    btn.innerHTML = '<span class="spin"></span> Finishing…';
+    const big = await loadImageEl(src);
+
+    // remove white background at the upscaled size
+    const c = document.createElement('canvas');
+    c.width = big.naturalWidth; c.height = big.naturalHeight;
+    const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
+    for(let i=0;i<d.length;i+=4){ if(d[i]>235 && d[i+1]>235 && d[i+2]>235) d[i+3]=0; }
+    ctx.putImageData(data, 0, 0);
+
+    // place on the 5000x5500 print canvas
+    const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
+    const octx = out.getContext('2d'); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
+    const k = Math.min(PRINT_W/c.width, PRINT_H/c.height) * 0.92;
+    const dw = c.width*k, dh = c.height*k;
+    octx.drawImage(c, (PRINT_W-dw)/2, (PRINT_H-dh)/2, dw, dh);
+
+    await new Promise(res => out.toBlob(b => {
+      if(!b){ toast('Export failed — try again', true); return res(); }
+      const u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-AI-upscaled-5000x5500.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+      res();
+    }, 'image/png'));
+  } catch(e){
+    console.warn(e);
+    toast('Upscale failed — try again or use HD PNG (vectorized)', true);
+  }
+  btn.disabled = false; btn.textContent = 'AI upscale (HD)';
 }
 
 /* ---------- SEO listing ---------- */
