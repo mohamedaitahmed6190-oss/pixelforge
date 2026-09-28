@@ -539,6 +539,7 @@ $('#cBtn').onclick = async () => {
         <p><strong>Visual:</strong> ${esc(c.visual)}</p>
         <p><strong>Buyer:</strong> ${esc(c.buyer)}</p>
         <p><strong>Why it sells:</strong> ${esc(c.why)}</p>
+        <p><strong>Best style:</strong> ${esc(c.style || '')}</p>
         <div class="row">
           <button class="btn-sec" data-use="${i}">Use</button>
           <button class="btn-sec" data-save="${i}">Save</button>
@@ -547,8 +548,10 @@ $('#cBtn').onclick = async () => {
     box.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
       const c = d.concepts[b.dataset.use];
       $('#idea').value = c.visual; $('#exactText').value = c.text;
+      const opt = [...$('#style').options].find(o => o.textContent === c.style);
+      if(opt) $('#style').value = opt.value;
       $('#idea').scrollIntoView({ behavior:'smooth', block:'center' });
-      toast('Added to the form — tap Generate');
+      toast(`Added with ${c.style || 'current'} style — tap Generate`);
     });
     box.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
       const c = d.concepts[b.dataset.save];
@@ -902,4 +905,4 @@ function toast(msg, err){
 }
 </script>
 </body>
-</html>
+  </html>
