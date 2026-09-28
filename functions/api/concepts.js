@@ -1,6 +1,5 @@
 // Cloudflare Pages Function — /api/concepts
-// Generates 10 niche t-shirt concepts (insider jokes) with Workers AI.
-// Uses the same "AI" binding as /api/generate — no extra setup.
+// Generates 10 niche t-shirt concepts (insider jokes) + the best art style for each.
 
 const SYSTEM_PROMPT = `You are a top-selling TeePublic designer who writes niche t-shirt concepts that sell.
 Generate exactly 10 t-shirt design concepts for the given niche.
@@ -10,6 +9,20 @@ Each concept must have:
 - "visual": ONE cute or funny character or object that SHOWS the joke, described in one sentence an illustrator can draw. Do not put the shirt text in this field.
 - "buyer": who wears it, and why they would buy it for themselves or as a gift.
 - "why": why it sells, explaining the insider joke only this niche would get.
+- "style": the ONE art style from the list below that will make this design look most professional and sell best.
+
+Allowed styles (use the exact name):
+Screen print, Vintage badge, Tattoo flash, Typography, Cute kawaii, Flat vector, Ink sketch, Linocut print, Engraving, Dotwork stipple, Vintage naturalist, Watercolor, Gouache, Oil painting, Risograph, Woodblock (ukiyo-e), Charcoal & pastel, Fine art painterly, Surreal, Realistic
+
+How to choose the style:
+- Funny text-based joke with a character: Screen print, Vintage badge or Tattoo flash (bold lettering prints clean and reads from far away).
+- Cute babies, kids, pets, soft/wholesome jokes: Cute kawaii or Gouache.
+- Animals, nature, fishing, hunting, gardening, outdoors: Linocut print or Vintage naturalist.
+- Spooky, gothic, skeletons, dark humor for adults: Engraving, Dotwork stipple or Tattoo flash.
+- Elegant, faith, mom, floral, sentimental: Watercolor or Typography.
+- Mostly words with a tiny icon: Typography.
+- Retro, 70s, music, indie vibe: Risograph or Vintage badge.
+- Prefer bold styles (Screen print, Vintage badge, Tattoo flash) whenever the text is the main joke, because AI renders lettering best in them.
 
 Rules:
 - Every joke must be an insider joke that only people in this niche would get. No generic phrases such as "Stay Spooky", "Coffee Lover", "Live Laugh Love".
@@ -18,7 +31,7 @@ Rules:
 - No offensive, political or adult content.
 
 Respond with ONLY a valid JSON array of 10 objects, no markdown, no commentary, in exactly this shape:
-[{"text":"...","visual":"...","buyer":"...","why":"..."}]`;
+[{"text":"...","visual":"...","buyer":"...","why":"...","style":"..."}]`;
 
 const MODELS = [
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
@@ -48,6 +61,15 @@ function responseText(result) {
   return result;
 }
 
+const STYLES = ['Screen print','Vintage badge','Tattoo flash','Typography','Cute kawaii','Flat vector','Ink sketch','Linocut print','Engraving','Dotwork stipple','Vintage naturalist','Watercolor','Gouache','Oil painting','Risograph','Woodblock (ukiyo-e)','Charcoal & pastel','Fine art painterly','Surreal','Realistic'];
+function pickStyle(s) {
+  const v = String(s || '').trim().toLowerCase();
+  if (!v) return 'Screen print';
+  return STYLES.find(x => x.toLowerCase() === v)
+      || STYLES.find(x => v.includes(x.toLowerCase()) || (v.length > 3 && x.toLowerCase().includes(v)))
+      || 'Screen print';
+}
+
 function clean(list) {
   return list
     .filter(c => c && c.text && c.visual)
@@ -55,7 +77,8 @@ function clean(list) {
       text: String(c.text).trim().replace(/^["']|["']$/g, ''),
       visual: String(c.visual).trim(),
       buyer: String(c.buyer || '').trim(),
-      why: String(c.why || '').trim()
+      why: String(c.why || '').trim(),
+      style: pickStyle(c.style)
     }))
     .filter(c => c.text.split(/\s+/).length <= 6)
     .slice(0, 10);
