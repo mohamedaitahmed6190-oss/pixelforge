@@ -568,6 +568,8 @@ $('#genBtn').onclick = async () => {
   for(let i=0;i<2;i++){
     const d = document.createElement('div');
     d.className = 'card';
+    d.dataset.text = $('#exactText').value.trim();
+    d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
       <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
@@ -819,7 +821,7 @@ async function loadMetadata(slot, idea, product, style){
   const btn = slot.querySelector('.metaBtn'), box = slot.querySelector('.meta');
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Writing…';
   try {
-    const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
+    const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&text=${encodeURIComponent(slot.dataset.text || '')}&niche=${encodeURIComponent(slot.dataset.niche || '')}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
     const d = await r.json();
     if(d.error) throw new Error(d.error);
     box.innerHTML = renderMetadata(d);
@@ -869,4 +871,5 @@ function toast(msg, err){
 }
 </script>
 </body>
-</html>
+  </html>
+  
