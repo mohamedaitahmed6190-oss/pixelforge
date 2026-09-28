@@ -450,7 +450,7 @@ $('#genBtn').onclick = async () => {
     d.className = 'card';
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
-      <button class="btn-sec svgBtn" disabled>Download SVG (vector)</button>
+      <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
       <button class="btn-sec metaBtn" disabled>Write listing</button>
       <div class="meta"></div>`;
     $('#results').prepend(d);
@@ -546,7 +546,7 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   dl.onclick = () => download(finalUrl, idx);
   const svgBtn = slot.querySelector('.svgBtn');
   svgBtn.disabled = false;
-  svgBtn.onclick = () => downloadSVG(finalUrl, idx, svgBtn);
+  svgBtn.onclick = () => downloadVectorPNG(finalUrl, idx, svgBtn);
   const metaBtn = slot.querySelector('.metaBtn');
   metaBtn.disabled = false;
   metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
@@ -582,12 +582,13 @@ async function download(url, idx){
   }
 }
 
-/* ---------- vector export (SVG) ---------- */
-async function downloadSVG(url, idx, btn){
+/* ---------- vectorize → HD PNG (sharp edges at 5000x5500) ---------- */
+async function downloadVectorPNG(url, idx, btn){
   if(!window.ImageTracer){ toast('Vector tool not loaded — refresh the page', true); return; }
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Converting…';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
   await sleep(50);
   try {
+    // 1) trace the design into vector shapes
     const img = await loadImageEl(url);
     const size = 1024;
     const c = document.createElement('canvas'); c.width = size; c.height = size;
@@ -595,22 +596,36 @@ async function downloadSVG(url, idx, btn){
     const s = Math.min(size/img.naturalWidth, size/img.naturalHeight);
     const w = img.naturalWidth*s, h = img.naturalHeight*s;
     ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
-    const data = ctx.getImageData(0, 0, size, size);
-    let svg = ImageTracer.imagedataToSVG(data, {
-      numberofcolors: 16, colorsampling: 2, mincolorratio: 0,
-      ltres: 1, qtres: 1, pathomit: 12, blurradius: 0,
-      strokewidth: 0, roundcoords: 1, viewbox: true, desc: false
+    let svg = ImageTracer.imagedataToSVG(ctx.getImageData(0, 0, size, size), {
+      numberofcolors: 24, colorsampling: 2, mincolorratio: 0,
+      ltres: 0.5, qtres: 0.5, pathomit: 8, blurradius: 0,
+      strokewidth: 0, roundcoords: 2, viewbox: true, desc: false
     });
-    svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, ''); // drop transparent background
-    const u = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
-    const a = document.createElement('a');
-    a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}.svg`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(u), 10000);
+    svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')
+             .replace('<svg ', `<svg width="${size}" height="${size}" `);
+
+    // 2) render the vector at print size → razor-sharp PNG
+    const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
+    const vec = await loadImageEl(svgUrl);
+    const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
+    const octx = out.getContext('2d');
+    const k = Math.min(PRINT_W/size, PRINT_H/size) * 0.92;
+    const dw = size*k, dh = size*k;
+    octx.drawImage(vec, (PRINT_W-dw)/2, (PRINT_H-dh)/2, dw, dh);
+    URL.revokeObjectURL(svgUrl);
+
+    await new Promise(res => out.toBlob(b => {
+      if(!b){ toast('Export failed — try again', true); return res(); }
+      const u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-HD-5000x5500.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+      res();
+    }, 'image/png'));
   } catch(e){
-    toast('SVG conversion failed for this image', true);
+    toast('Vectorizing failed for this image — use the normal PNG', true);
   }
-  btn.disabled = false; btn.textContent = 'Download SVG (vector)';
+  btn.disabled = false; btn.textContent = 'HD PNG (vectorized)';
 }
 
 /* ---------- SEO listing ---------- */
