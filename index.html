@@ -57,6 +57,7 @@
   .img-box{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;overflow:hidden;
     background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .img-box img{width:100%;height:100%;object-fit:contain}
+  .img-box.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
   .status{font-size:12.5px;color:var(--muted);text-align:center;padding:0 12px}
   .status.err{color:#C62828;font-weight:600}
   .btn-sec{width:100%;margin-top:8px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;font-size:14px;cursor:pointer}
@@ -143,6 +144,15 @@
               <option value="american traditional tattoo flash art, bold hand-inked black outlines, limited vintage palette, tattoo artist style">Tattoo flash</option>
               <option value="fine art digital painting, painterly brushwork, rich detail, not cartoon, not clipart">Fine art painterly</option>
               <option value="surreal fine art illustration, dreamlike atmosphere, painterly detail, not cartoon">Surreal</option>
+            </optgroup>
+            <optgroup label="For dark shirts (black, red, purple…)">
+              <option data-dark="1" value="bold screen print illustration made for dark t-shirts, bright saturated colors, thick white outlines, white text, no black outlines, no dark colors">Bright screen print (dark tee)</option>
+              <option data-dark="1" value="white ink illustration made for black t-shirts, white and cream linework only, crosshatching in white, chalky texture, no black lines">White ink sketch (dark tee)</option>
+              <option data-dark="1" value="glowing neon line art illustration, bright neon pink, cyan, yellow and white light lines, glow effect, no black elements">Neon glow (dark tee)</option>
+              <option data-dark="1" value="traditional tattoo flash art made for dark shirts, bright colors with thick white and cream outlines instead of black outlines">Tattoo flash (dark tee)</option>
+              <option data-dark="1" value="vintage distressed retro illustration made for dark shirts, cream, mustard, orange and teal ink, white outlines, faded worn print texture, no black">Vintage distressed (dark tee)</option>
+              <option data-dark="1" value="retro 80s synthwave illustration, glowing hot pink, purple and cyan, sunset and grid, bright colors, no black elements">Synthwave (dark tee)</option>
+              <option data-dark="1" value="chalkboard style hand lettering and illustration in white and pastel chalk, dusty chalk texture, no black">Chalk lettering (dark tee)</option>
             </optgroup>
             <optgroup label="Graphic & flat">
               <option value="vintage retro badge illustration, distressed texture, limited color palette">Vintage badge</option>
@@ -570,6 +580,11 @@ $('#cBtn').onclick = async () => {
 };
 
 /* ---------- prompt builder ---------- */
+function isDark(){ return $('#style').selectedOptions[0].dataset.dark === '1'; }
+// true when a pixel is background: near-white (light designs) or near-black (dark-shirt designs)
+function isBgPixel(d, i, dark){
+  return dark ? (d[i] < 28 && d[i+1] < 28 && d[i+2] < 28) : (d[i] > 235 && d[i+1] > 235 && d[i+2] > 235);
+}
 function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
   const idea = $('#idea').value.trim() || 'retro sunset over mountains';
@@ -577,9 +592,11 @@ function buildPrompt(){
   const textRule = text
     ? `The design must contain ONLY this exact text: "${text}". Spell it exactly as written, correct spelling, every letter present, no missing letters, no extra words, no other text. `
     : `No text, no letters, no words anywhere in the design. `;
+  const bg = isDark()
+    ? `subject isolated on a solid pure black background with no shadows and no background scenery; the artwork itself uses NO black: all outlines, shading and text are white, cream or bright colors so it prints on a black shirt, `
+    : `subject isolated on a solid plain white background with no shadows and no background scenery, `;
   return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. Style: ${style}. ` +
-    `Requirements: high contrast, no watermark, clean crisp edges, ` +
-    `subject isolated on a solid plain white background with no shadows and no background scenery, ` +
+    `Requirements: high contrast, no watermark, clean crisp edges, ` + bg +
     `professional illustration quality. Square 1:1 composition.`;
 }
 
@@ -603,6 +620,7 @@ $('#genBtn').onclick = async () => {
     const d = document.createElement('div');
     d.className = 'card';
     d.dataset.text = $('#exactText').value.trim();
+    d.dataset.dark = isDark() ? '1' : '';
     d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
@@ -676,8 +694,8 @@ async function tryPollinations(fullPrompt, seed, box){
   return null;
 }
 
-// near-white pixels → transparent
-function makeTransparent(url){
+// background pixels → transparent (white bg for light designs, black bg for dark-shirt designs)
+function makeTransparent(url, dark){
   return new Promise((resolve) => {
     const img = new Image(); img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -686,7 +704,7 @@ function makeTransparent(url){
         c.width = img.naturalWidth; c.height = img.naturalHeight;
         const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
         const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
-        for(let i=0;i<d.length;i+=4){ if(d[i]>235 && d[i+1]>235 && d[i+2]>235) d[i+3]=0; }
+        for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
         ctx.putImageData(data, 0, 0);
         c.toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
       } catch(e){ resolve(url); }
@@ -697,7 +715,9 @@ function makeTransparent(url){
 }
 
 async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel){
-  const finalUrl = await makeTransparent(url);
+  const dark = slot.dataset.dark === '1';
+  const finalUrl = await makeTransparent(url, dark);
+  if(dark) box.classList.add('dark');
   box.innerHTML = `<img src="${finalUrl}" alt="Generated design">`;
   dl.disabled = false;
   dl.onclick = () => download(finalUrl, idx);
@@ -706,7 +726,7 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   svgBtn.onclick = () => downloadVectorPNG(finalUrl, idx, svgBtn);
   const upBtn = slot.querySelector('.upBtn');
   upBtn.disabled = false;
-  upBtn.onclick = () => downloadUpscaled(url, idx, upBtn);
+  upBtn.onclick = () => downloadUpscaled(url, idx, upBtn, dark);
   const metaBtn = slot.querySelector('.metaBtn');
   metaBtn.disabled = false;
   metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
@@ -808,8 +828,8 @@ async function getUpscaler(){
   upscaler = new Upscaler({ model: ESRGANSlim2x });
   return upscaler;
 }
-// originalUrl = the image BEFORE background removal (AI needs the white background)
-async function downloadUpscaled(originalUrl, idx, btn){
+// originalUrl = the image BEFORE background removal (AI needs the solid background)
+async function downloadUpscaled(originalUrl, idx, btn, dark){
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Loading AI…';
   try {
     const up = await getUpscaler();
@@ -826,7 +846,7 @@ async function downloadUpscaled(originalUrl, idx, btn){
     c.width = big.naturalWidth; c.height = big.naturalHeight;
     const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
     const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
-    for(let i=0;i<d.length;i+=4){ if(d[i]>235 && d[i+1]>235 && d[i+2]>235) d[i+3]=0; }
+    for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
     ctx.putImageData(data, 0, 0);
 
     const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
