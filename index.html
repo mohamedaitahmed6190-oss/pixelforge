@@ -77,6 +77,14 @@
   .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
   .hgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer}
 
+  .tool-title{font-size:17px;margin:0}
+  .concept{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px;background:#FAFBFC}
+  .concept .ct{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px}
+  .concept p{margin:4px 0;font-size:13px;color:var(--muted)}
+  .concept p strong{color:var(--ink);font-weight:600}
+  .concept .row{display:flex;gap:6px;margin-top:8px}
+  .concept .row .btn-sec{margin-top:0}
+
   .spin{width:20px;height:20px;border:2.5px solid #D6DAE2;border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;display:inline-block;vertical-align:-5px}
   .gen .spin{border-color:rgba(255,255,255,.35);border-top-color:#fff;margin-right:6px}
   @keyframes s{to{transform:rotate(360deg)}}
@@ -174,6 +182,30 @@
 
       <button id="genBtn" class="gen">Generate 2 designs</button>
       <p class="note">Keep text to 1–4 words for clean lettering. Always check spelling before uploading.</p>
+
+      <div class="divider"></div>
+      <h3 class="tool-title">Concept generator</h3>
+      <p class="note" style="margin:4px 0 12px">10 insider-joke ideas for one niche. Tap "Use" to fill the form.</p>
+      <div class="field">
+        <label for="cNiche">Niche</label>
+        <input id="cNiche" type="text" placeholder="e.g. ER nurses, sourdough bakers, pitbull moms">
+      </div>
+      <div class="field">
+        <label for="cSeason">Season</label>
+        <select id="cSeason">
+          <option value="">None (evergreen)</option>
+          <option>Halloween</option>
+          <option>Thanksgiving</option>
+          <option>Christmas</option>
+          <option>Valentine's Day</option>
+          <option>Mother's Day</option>
+          <option>Father's Day</option>
+          <option>Summer</option>
+          <option>Back to school</option>
+        </select>
+      </div>
+      <button id="cBtn" class="btn-sec" type="button">Generate 10 concepts</button>
+      <div id="concepts"></div>
     </aside>
 
     <section>
@@ -460,6 +492,49 @@ $('#saveIdea').onclick = () => {
 };
 fillIdeas();
 
+/* ---------- concept generator (insider-joke ideas) ---------- */
+$('#cBtn').onclick = async () => {
+  const niche = $('#cNiche').value.trim();
+  if(!niche){ toast('Write a niche first', true); $('#cNiche').focus(); return; }
+  const btn = $('#cBtn'), box = $('#concepts');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Thinking…'; box.innerHTML = '';
+  try {
+    const r = await fetch(`/api/concepts?niche=${encodeURIComponent(niche)}&season=${encodeURIComponent($('#cSeason').value)}`, { cache:'no-store' });
+    const d = await r.json();
+    if(d.error || !d.concepts) throw new Error(d.message || d.error);
+    box.innerHTML = d.concepts.map((c, i) => `
+      <div class="concept">
+        <div class="ct">"${esc(c.text)}"</div>
+        <p><strong>Visual:</strong> ${esc(c.visual)}</p>
+        <p><strong>Buyer:</strong> ${esc(c.buyer)}</p>
+        <p><strong>Why it sells:</strong> ${esc(c.why)}</p>
+        <div class="row">
+          <button class="btn-sec" data-use="${i}">Use</button>
+          <button class="btn-sec" data-save="${i}">Save</button>
+        </div>
+      </div>`).join('');
+    box.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+      const c = d.concepts[b.dataset.use];
+      $('#idea').value = c.visual; $('#exactText').value = c.text;
+      $('#idea').scrollIntoView({ behavior:'smooth', block:'center' });
+      toast('Added to the form — tap Generate');
+    });
+    box.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
+      const c = d.concepts[b.dataset.save];
+      const all = loadCustom(), key = 'My own ideas';
+      const list = all[key] || [];
+      if(!list.some(x => x[0] === c.visual && x[1] === c.text)) list.unshift([c.visual, c.text]);
+      all[key] = list; saveCustom(all);
+      if(nicheSel.value === 'mine') fillIdeas();
+      b.textContent = 'Saved ✓'; b.disabled = true;
+    });
+  } catch(e){
+    console.warn(e);
+    toast('Could not generate concepts — try again', true);
+  }
+  btn.disabled = false; btn.textContent = 'Generate 10 concepts';
+};
+
 /* ---------- prompt builder ---------- */
 function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
@@ -711,7 +786,6 @@ async function downloadUpscaled(originalUrl, idx, btn){
     btn.innerHTML = '<span class="spin"></span> Finishing…';
     const big = await loadImageEl(src);
 
-    // remove white background at the upscaled size
     const c = document.createElement('canvas');
     c.width = big.naturalWidth; c.height = big.naturalHeight;
     const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
@@ -719,7 +793,6 @@ async function downloadUpscaled(originalUrl, idx, btn){
     for(let i=0;i<d.length;i+=4){ if(d[i]>235 && d[i+1]>235 && d[i+2]>235) d[i+3]=0; }
     ctx.putImageData(data, 0, 0);
 
-    // place on the 5000x5500 print canvas
     const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
     const octx = out.getContext('2d'); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
     const k = Math.min(PRINT_W/c.width, PRINT_H/c.height) * 0.92;
