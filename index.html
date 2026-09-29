@@ -107,6 +107,11 @@
   .seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   input[type=range]{width:100%;accent-color:var(--accent)}
   input[type=color]{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px;cursor:pointer}
+  .cpick{display:flex;gap:8px}
+  .cpick input[type=color]{width:52px;flex:none}
+  .cpick input[type=text]{flex:1;font-family:ui-monospace,monospace;text-transform:uppercase}
+  .swatches{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:50}
   .toast.err{background:#C62828}
   footer{text-align:center;color:var(--muted);font-size:13px;padding:0 20px 30px}
@@ -274,18 +279,20 @@
     <canvas id="edCanvas" width="600" height="660"></canvas>
     <div class="seg"><button type="button" data-line="top" class="on">Top line</button><button type="button" data-line="bottom">Bottom line</button></div>
     <div class="field"><label for="edText">Text</label><input id="edText" type="text" placeholder="Leave empty for no text"></div>
-    <div class="row2">
-      <div class="field"><label for="edFont">Font</label><select id="edFont"></select></div>
-      <div class="field"><label for="edColor">Color</label><input id="edColor" type="color"></div>
+    <div class="field"><label for="edFont">Font</label><select id="edFont"></select></div>
+    <div class="field"><label for="edHex">Color <span class="hint">(tap a swatch or type a code like #E63946)</span></label>
+      <div class="cpick"><input id="edColor" type="color" aria-label="Pick color"><input id="edHex" type="text" maxlength="7" placeholder="#FFFFFF"></div>
+      <div class="swatches" id="swLine"></div>
     </div>
     <div class="field"><label for="edSize">Size</label><input id="edSize" type="range" min="30" max="260"></div>
     <div class="field"><label for="edArc">Curve <span class="hint">(left = smile, right = rainbow)</span></label><input id="edArc" type="range" min="-100" max="100"></div>
     <div class="field"><label for="edY">Position (up / down)</label><input id="edY" type="range" min="40" max="1060"></div>
     <div class="divider"></div>
-    <div class="row2">
-      <div class="field"><label for="edStroke">Outline color</label><input id="edStroke" type="color"></div>
-      <div class="field"><label for="edSW">Outline width</label><input id="edSW" type="range" min="0" max="20"></div>
+    <div class="field"><label for="edStrokeHex">Outline color</label>
+      <div class="cpick"><input id="edStroke" type="color" aria-label="Pick outline color"><input id="edStrokeHex" type="text" maxlength="7" placeholder="#000000"></div>
+      <div class="swatches" id="swStroke"></div>
     </div>
+    <div class="field"><label for="edSW">Outline width</label><input id="edSW" type="range" min="0" max="20"></div>
     <div class="field"><label for="edImgS">Picture size</label><input id="edImgS" type="range" min="30" max="100"></div>
     <div class="field"><label for="edImgY">Picture position</label><input id="edImgY" type="range" min="-300" max="300"></div>
     <button id="edApply" class="gen" type="button">Apply to design</button>
@@ -1034,6 +1041,7 @@ function edFill(){
   $('#edText').value = L.text; $('#edFont').value = L.font; $('#edColor').value = L.color;
   $('#edSize').value = L.size; $('#edArc').value = L.arc; $('#edY').value = L.y;
   $('#edStroke').value = ED.s.stroke; $('#edSW').value = ED.s.sw;
+  $('#edHex').value = L.color.toUpperCase(); $('#edStrokeHex').value = ED.s.stroke.toUpperCase();
   $('#edImgS').value = ED.s.imgS; $('#edImgY').value = ED.s.imgY;
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.line === ED.cur));
 }
@@ -1048,6 +1056,32 @@ Object.entries(lineBind).forEach(([id, key]) => {
 [['edStroke','stroke',false],['edSW','sw',true],['edImgS','imgS',true],['edImgY','imgY',true]].forEach(([id, key, num]) => {
   $('#' + id).addEventListener('input', e => { ED.s[key] = num ? +e.target.value : e.target.value; edDraw(); });
 });
+/* color codes + quick swatches */
+const SWATCHES = ['#FFFFFF','#F4E9D0','#FFD23F','#FF8C42','#E63946','#FF4FA3','#B388FF','#4CC9F0','#2EC4B6','#7BC950','#8B5A2B','#16181D'];
+function normHex(v){
+  v = (v || '').trim(); if(!v.startsWith('#')) v = '#' + v;
+  if(/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join('');
+  return /^#[0-9a-f]{6}$/i.test(v) ? v.toUpperCase() : null;
+}
+function setLineColor(v){ ED.s[ED.cur].color = v; $('#edColor').value = v; $('#edHex').value = v; edDraw(); }
+function setStrokeColor(v){
+  ED.s.stroke = v; $('#edStroke').value = v; $('#edStrokeHex').value = v;
+  if(!ED.s.sw){ ED.s.sw = 6; $('#edSW').value = 6; }   // picking an outline color turns the outline on
+  edDraw();
+}
+[['swLine', setLineColor], ['swStroke', setStrokeColor]].forEach(([id, fn]) => {
+  SWATCHES.forEach(c => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw';
+    b.style.background = c; b.title = c; b.setAttribute('aria-label', c);
+    b.onclick = () => fn(c);
+    $('#' + id).appendChild(b);
+  });
+});
+$('#edHex').addEventListener('input', e => { const v = normHex(e.target.value); if(v){ ED.s[ED.cur].color = v; $('#edColor').value = v; edDraw(); } });
+$('#edColor').addEventListener('input', e => { $('#edHex').value = e.target.value.toUpperCase(); });
+$('#edStrokeHex').addEventListener('input', e => { const v = normHex(e.target.value); if(v){ ED.s.stroke = v; $('#edStroke').value = v; edDraw(); } });
+$('#edStroke').addEventListener('input', e => { $('#edStrokeHex').value = e.target.value.toUpperCase(); });
+
 document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { ED.cur = b.dataset.line; edFill(); });
 
 async function openEditor(slot){
@@ -1183,4 +1217,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-  </html>
+</html>
