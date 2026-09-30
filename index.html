@@ -102,9 +102,9 @@
   .ed canvas{width:100%;height:auto;display:block;border-radius:12px;
     background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .ed canvas.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
-  .seg{display:flex;gap:6px;margin:12px 0}
-  .seg button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
-  .seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .seg,.seg2{display:flex;gap:6px;margin:12px 0}
+  .seg button,.seg2 button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
+  .seg button.on,.seg2 button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   input[type=range]{width:100%;accent-color:var(--accent)}
   input[type=color]{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px;cursor:pointer}
   .cpick{display:flex;gap:8px}
@@ -280,6 +280,8 @@
   <div class="ed-box">
     <div class="ed-head"><h3>Add text</h3><button id="edClose" class="mini" type="button">✕ Close</button></div>
     <canvas id="edCanvas" width="600" height="660"></canvas>
+    <div class="seg2" id="edBgSeg"><button type="button" data-bg="checker" class="on">Transparent</button><button type="button" data-bg="white">White tee</button><button type="button" data-bg="black">Black tee</button></div>
+    <label class="check" style="margin:0 0 4px"><input type="checkbox" id="edGuides" checked> <span>Show center lines (not printed)</span></label>
     <div class="seg"><button type="button" data-line="top" class="on">Top line</button><button type="button" data-line="bottom">Bottom line</button></div>
     <div class="field"><label for="edText">Text</label><input id="edText" type="text" placeholder="Leave empty for no text"></div>
     <div class="field"><label for="edFont">Font</label><select id="edFont"></select></div>
@@ -298,7 +300,9 @@
     </div>
     <div class="field"><label for="edSW">Outline width</label><input id="edSW" type="range" min="0" max="20"></div>
     <div class="field"><label for="edImgS">Picture size</label><input id="edImgS" type="range" min="30" max="100"></div>
-    <div class="field"><label for="edImgY">Picture position</label><input id="edImgY" type="range" min="-300" max="300"></div>
+    <div class="field"><label for="edImgX">Picture position (left / right)</label><input id="edImgX" type="range" min="-500" max="500"></div>
+    <div class="field"><label for="edImgY">Picture position (up / down)</label><input id="edImgY" type="range" min="-500" max="500"></div>
+    <button id="edCenter" class="btn-sec" type="button" style="margin:0 0 14px">🎯 Center picture</button>
     <button id="edApply" class="gen" type="button">Apply to design</button>
     <button id="edApplyDl" class="btn-sec" type="button">Apply & download PNG</button>
   </div>
@@ -771,33 +775,70 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   return { ok:true };
 }
 
-/* ---------- print export 5000x5500 ---------- */
-const PRINT_W = 5000, PRINT_H = 5500;
+/* ---------- print export (artwork >= 5000 x 5500 without transparent margins) ---------- */
+const PRINT_W = 5000, PRINT_H = 5500, MAX_SIDE = 10000;
+const RAW_URLS = new Set();   // files that are already print-ready (text added)
+// bounding box of the visible (non-transparent) pixels of a canvas
+function alphaBox(c){
+  const sc = Math.min(1, 800 / Math.max(c.width, c.height));
+  const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(c.width * sc)); t.height = Math.max(1, Math.round(c.height * sc));
+  const x = t.getContext('2d', { willReadFrequently:true }); x.drawImage(c, 0, 0, t.width, t.height);
+  const d = x.getImageData(0, 0, t.width, t.height).data;
+  let a = t.width, b = t.height, e = -1, f = -1;
+  for(let y = 0; y < t.height; y++){
+    for(let i = 0; i < t.width; i++){
+      if(d[(y*t.width + i)*4 + 3] > 10){
+        if(i < a) a = i; if(i > e) e = i;
+        if(y < b) b = y; if(y > f) f = y;
+      }
+    }
+  }
+  if(e < 0) return { x:0, y:0, w:c.width, h:c.height };
+  const x0 = Math.max(0, Math.floor(a / sc)), y0 = Math.max(0, Math.floor(b / sc));
+  const x1 = Math.min(c.width, Math.ceil((e + 1) / sc)), y1 = Math.min(c.height, Math.ceil((f + 1) / sc));
+  return { x:x0, y:y0, w:x1 - x0, h:y1 - y0 };
+}
+// TeePublic measures the artwork WITHOUT transparent margins: it must be at least 5000 x 5500
+function printScale(bw, bh){
+  const need = Math.max(PRINT_W / bw, PRINT_H / bh);
+  return Math.min(need, MAX_SIDE / Math.max(bw, bh));
+}
+// crops the transparent margins and scales the artwork to print size
+function fillExport(src){
+  const bb = alphaBox(src), k = printScale(bb.w, bb.h);
+  const out = document.createElement('canvas'); out.width = Math.round(bb.w * k); out.height = Math.round(bb.h * k);
+  const o = out.getContext('2d'); o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+  o.drawImage(src, bb.x, bb.y, bb.w, bb.h, 0, 0, out.width, out.height);
+  return out;
+}
 function loadImageEl(url){
   return new Promise((res, rej) => { const i = new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=url; });
 }
 async function download(url, idx, name){
+  const fname = name || `pod-design-${Date.now()}-${idx+1}-print.png`;
   try {
+    if(RAW_URLS.has(url)){   // already print-ready (text added) → save as is
+      const a = document.createElement('a'); a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
     const img = await loadImageEl(url);
-    const c = document.createElement('canvas'); c.width = PRINT_W; c.height = PRINT_H;
-    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const s = img.naturalWidth === PRINT_W ? 1 : Math.min(PRINT_W/img.naturalWidth, PRINT_H/img.naturalHeight) * 0.92;
-    const w = img.naturalWidth*s, h = img.naturalHeight*s;
-    ctx.drawImage(img, (PRINT_W-w)/2, (PRINT_H-h)/2, w, h);
-    c.toBlob(b => {
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext('2d').drawImage(img, 0, 0);
+    fillExport(c).toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return; }
       const u = URL.createObjectURL(b), a = document.createElement('a');
-      a.href = u; a.download = name || `pod-design-${Date.now()}-${idx+1}-5000x5500.png`;
+      a.href = u; a.download = fname;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 10000);
     }, 'image/png');
   } catch(e){
-    toast('Could not export at 5000×5500 — opening original', true);
+    toast('Could not export at print size — opening original', true);
     window.open(url, '_blank');
   }
 }
 
-/* ---------- vectorize → HD PNG (sharp edges at 5000x5500) ---------- */
+/* ---------- vectorize → HD PNG (sharp edges at print size) ---------- */
 async function downloadVectorPNG(url, idx, btn){
   if(!window.ImageTracer){ toast('Vector tool not loaded — refresh the page', true); return; }
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
@@ -822,17 +863,18 @@ async function downloadVectorPNG(url, idx, btn){
     // 2) render the vector at print size → razor-sharp PNG
     const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
     const vec = await loadImageEl(svgUrl);
-    const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
+    const bb = alphaBox(c);   // real artwork box inside the 1024 canvas
+    const k = printScale(bb.w, bb.h);
+    const out = document.createElement('canvas'); out.width = Math.round(bb.w * k); out.height = Math.round(bb.h * k);
     const octx = out.getContext('2d');
-    const k = Math.min(PRINT_W/size, PRINT_H/size) * 0.92;
-    const dw = size*k, dh = size*k;
-    octx.drawImage(vec, (PRINT_W-dw)/2, (PRINT_H-dh)/2, dw, dh);
+    octx.setTransform(k, 0, 0, k, -bb.x * k, -bb.y * k);
+    octx.drawImage(vec, 0, 0, size, size);
     URL.revokeObjectURL(svgUrl);
 
     await new Promise(res => out.toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return res(); }
       const u = URL.createObjectURL(b), a = document.createElement('a');
-      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-HD-5000x5500.png`;
+      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-HD-print.png`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 10000);
       res();
@@ -887,17 +929,13 @@ async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
     for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
     ctx.putImageData(data, 0, 0);
 
-    // place on the 5000x5500 print canvas
-    const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
-    const octx = out.getContext('2d'); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
-    const k = Math.min(PRINT_W/c.width, PRINT_H/c.height) * 0.92;
-    const dw = c.width*k, dh = c.height*k;
-    octx.drawImage(halo ? haloCanvas(c, Math.round(c.width * 0.012)) : c, (PRINT_W-dw)/2, (PRINT_H-dh)/2, dw, dh);
+    // crop margins + scale to print size
+    const out = fillExport(halo ? haloCanvas(c, Math.round(c.width * 0.012)) : c);
 
     await new Promise(res => out.toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return res(); }
       const u = URL.createObjectURL(b), a = document.createElement('a');
-      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-AI-upscaled-5000x5500.png`;
+      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-AI-upscaled-print.png`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 10000);
       res();
@@ -1006,7 +1044,7 @@ const FONTS = [
   ['Cinzel',800],['Playfair Display',800],['Rye',400],['Creepster',400]
 ];
 const EW = 1000, EH = 1100;            // editor space (same ratio as 5000x5500)
-const ED = { slot:null, img:null, cur:'top', s:null };
+const ED = { slot:null, img:null, cur:'top', s:null, bg:'checker' };
 const edCv = $('#edCanvas'), edCtx = edCv.getContext('2d');
 FONTS.forEach(([f]) => { const o = document.createElement('option'); o.value = f; o.textContent = f; o.style.fontFamily = `"${f}"`; $('#edFont').appendChild(o); });
 let fontsReady = null;
@@ -1025,7 +1063,7 @@ function defaultState(slot){
   return {
     top:    { text: top,    font:'Luckiest Guy', size:120, arc:35, y:140, x:0, color: uni ? '#16181D' : (dark ? '#FFFFFF' : '#16181D') },
     bottom: { text: bottom, font:'Pacifico',     size:110, arc:0,  y:975, x:0, color: uni ? '#E4572E' : (dark ? '#FFD23F' : '#E4572E') },
-    stroke: uni ? '#FFFFFF' : (dark ? '#000000' : '#FFFFFF'), sw: uni ? 8 : 0, imgS: 70, imgY: 0
+    stroke: uni ? '#FFFFFF' : (dark ? '#000000' : '#FFFFFF'), sw: uni ? 8 : 0, imgS: 70, imgX: 0, imgY: 0
   };
 }
 
@@ -1057,7 +1095,7 @@ function drawLine(ctx, L, sw, stroke){
   });
 }
 
-// k = scale, tx/ty = offset (used by the export to fill the whole 5000x5500 canvas)
+// k = scale, tx/ty = offset (used by the export to crop to the real artwork)
 function renderText(ctx, k, tx = 0, ty = 0){
   const S = ED.s, img = ED.img;
   ctx.setTransform(k, 0, 0, k, tx, ty);
@@ -1066,7 +1104,7 @@ function renderText(ctx, k, tx = 0, ty = 0){
   const side = EW * S.imgS / 100;
   const r = Math.min(side / img.naturalWidth, side / img.naturalHeight);
   const w = img.naturalWidth * r, h = img.naturalHeight * r;
-  ctx.drawImage(img, (EW - w)/2, (EH - h)/2 + S.imgY, w, h);
+  ctx.drawImage(img, (EW - w)/2 + (S.imgX || 0), (EH - h)/2 + S.imgY, w, h);
   drawLine(ctx, S.top, S.sw, S.stroke);
   drawLine(ctx, S.bottom, S.sw, S.stroke);
 }
@@ -1093,7 +1131,43 @@ function fitBox(){
 }
 
 let edRaf = 0;
-function edDraw(){ cancelAnimationFrame(edRaf); edRaf = requestAnimationFrame(() => renderText(edCtx, edCv.width / EW)); }
+function drawGuides(){
+  const k = edCv.width / EW;
+  edCtx.save(); edCtx.setTransform(k, 0, 0, k, 0, 0);
+  edCtx.strokeStyle = 'rgba(255,45,149,.9)'; edCtx.lineWidth = 2.5; edCtx.setLineDash([14, 10]);
+  edCtx.beginPath();
+  edCtx.moveTo(EW/2, 0); edCtx.lineTo(EW/2, EH);
+  edCtx.moveTo(0, EH/2); edCtx.lineTo(EW, EH/2);
+  edCtx.stroke(); edCtx.restore();
+}
+function edDraw(){
+  cancelAnimationFrame(edRaf);
+  edRaf = requestAnimationFrame(() => { renderText(edCtx, edCv.width / EW); if($('#edGuides').checked) drawGuides(); });
+}
+// crops the empty margins of the picture so it is as big as its real content
+async function trimToContent(img){
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  const bb = alphaBox(c), pad = 6;
+  const x = Math.max(0, bb.x - pad), y = Math.max(0, bb.y - pad);
+  const w = Math.min(c.width - x, bb.w + pad * 2), h = Math.min(c.height - y, bb.h + pad * 2);
+  if(w >= c.width - 4 && h >= c.height - 4) return img;
+  const t = document.createElement('canvas'); t.width = w; t.height = h;
+  t.getContext('2d').drawImage(c, x, y, w, h, 0, 0, w, h);
+  const url = await new Promise(res => t.toBlob(b => res(URL.createObjectURL(b)), 'image/png'));
+  return loadImageEl(url);
+}
+function setEdBg(mode){
+  ED.bg = mode;
+  document.querySelectorAll('#edBgSeg button').forEach(b => b.classList.toggle('on', b.dataset.bg === mode));
+  edCv.style.background = mode === 'white' ? '#FFFFFF' : mode === 'black' ? '#111111' : '';
+}
+document.querySelectorAll('#edBgSeg button').forEach(b => b.onclick = () => setEdBg(b.dataset.bg));
+$('#edGuides').addEventListener('change', edDraw);
+$('#edCenter').onclick = () => {
+  ED.s.imgX = 0; ED.s.imgY = 0;   // the picture is trimmed to its content, so 0 / 0 = centered
+  $('#edImgX').value = 0; $('#edImgY').value = 0; edDraw();
+};
 
 function edFill(){
   const L = ED.s[ED.cur];
@@ -1102,7 +1176,7 @@ function edFill(){
   $('#edX').value = L.x || 0;
   $('#edStroke').value = ED.s.stroke; $('#edSW').value = ED.s.sw;
   $('#edHex').value = L.color.toUpperCase(); $('#edStrokeHex').value = ED.s.stroke.toUpperCase();
-  $('#edImgS').value = ED.s.imgS; $('#edImgY').value = ED.s.imgY;
+  $('#edImgS').value = ED.s.imgS; $('#edImgY').value = ED.s.imgY; $('#edImgX').value = ED.s.imgX || 0;
   document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.line === ED.cur));
 }
 const lineBind = { edText:'text', edFont:'font', edColor:'color', edSize:'size', edArc:'arc', edY:'y', edX:'x' };
@@ -1113,7 +1187,7 @@ Object.entries(lineBind).forEach(([id, key]) => {
     if(key === 'font') document.fonts.load(`${fontWeight(v)} 40px "${v}"`).then(edDraw); else edDraw();
   });
 });
-[['edStroke','stroke',false],['edSW','sw',true],['edImgS','imgS',true],['edImgY','imgY',true]].forEach(([id, key, num]) => {
+[['edStroke','stroke',false],['edSW','sw',true],['edImgS','imgS',true],['edImgX','imgX',true],['edImgY','imgY',true]].forEach(([id, key, num]) => {
   $('#' + id).addEventListener('input', e => { ED.s[key] = num ? +e.target.value : e.target.value; edDraw(); });
 });
 /* color codes + quick swatches */
@@ -1147,9 +1221,10 @@ document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { ED.cur
 async function openEditor(slot){
   try {
     ED.slot = slot; ED.cur = 'top';
-    ED.img = await loadImageEl(slot._base);
+    ED.img = await trimToContent(await loadImageEl(slot._base));
     ED.s = slot._ed ? JSON.parse(JSON.stringify(slot._ed)) : defaultState(slot);
     edCv.classList.toggle('dark', slot.dataset.dark === '1');
+    setEdBg('checker');
     edFill();
     $('#ed').hidden = false; document.body.style.overflow = 'hidden';
     renderText(edCtx, edCv.width / EW);
@@ -1163,24 +1238,19 @@ document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#ed').h
 
 async function applyText(andDownload){
   const slot = ED.slot, btn = $('#edApply');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Rendering 5000×5500…';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Rendering print file…';
   try {
     await loadFonts();
-    const c = document.createElement('canvas'); c.width = PRINT_W; c.height = PRINT_H;
-
-    // scale the content up so it fills the 5000x5500 canvas (no empty margins)
-    const bb = fitBox();
-    let k = PRINT_W / EW, tx = 0, ty = 0;
-    if(bb){
-      k  = Math.min(PRINT_W / bb.w, PRINT_H / bb.h);
-      tx = (PRINT_W - bb.w * k) / 2 - bb.x * k;
-      ty = (PRINT_H - bb.h * k) / 2 - bb.y * k;
-    }
-    renderText(c.getContext('2d'), k, tx, ty);
+    // crop to the real artwork and scale it so it is at least 5000x5500 (TeePublic rule)
+    const bb = fitBox() || { x:0, y:0, w:EW, h:EH };
+    const k = printScale(bb.w, bb.h);
+    const c = document.createElement('canvas'); c.width = Math.round(bb.w * k); c.height = Math.round(bb.h * k);
+    renderText(c.getContext('2d'), k, -bb.x * k, -bb.y * k);
 
     const blob = await new Promise(res => c.toBlob(res, 'image/png'));
     if(!blob) throw new Error('export failed');
     const url = URL.createObjectURL(blob);
+    RAW_URLS.add(url);
     slot._url = url;
     slot._ed = JSON.parse(JSON.stringify(ED.s));
     const newText = [ED.s.top.text, ED.s.bottom.text].map(t => t.trim()).filter(Boolean).join(' ');
@@ -1287,4 +1357,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-</html>
+                                                                                                            </html>
