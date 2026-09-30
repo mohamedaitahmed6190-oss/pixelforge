@@ -35,7 +35,7 @@
 
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px;position:sticky;top:16px}
   @media(max-width:900px){.panel{position:static}}
-  .panel.concept-panel{position:static;margin-top:28px}
+  .panel.concept-panel{position:static;margin:0 0 28px}
   .field{margin-bottom:14px}
   .field label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
   .field .hint{font-weight:400;color:var(--muted)}
@@ -48,7 +48,7 @@
   .gen:disabled{opacity:.55;cursor:not-allowed}
   .note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
 
-  .out-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  .out-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;scroll-margin-top:12px}
   .out-head h2{font-size:22px}
   .out-head span{color:var(--muted);font-size:13px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
@@ -225,21 +225,11 @@
 
       <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
 
-      <button id="genBtn" class="gen">Generate 2 designs</button>
+      <button id="genBtn" class="gen">Generate 4 designs</button>
       <p class="note">Keep text to 1–4 words for clean lettering. Always check spelling before uploading.</p>
     </aside>
 
     <section>
-      <div class="out-head">
-        <h2>Results</h2>
-        <span id="count"></span>
-      </div>
-      <div id="empty" class="empty">
-        <strong>No designs yet</strong>
-        Choose a niche and an idea, then generate.
-      </div>
-      <div id="results" class="grid"></div>
-
       <div class="panel concept-panel">
         <h3 class="tool-title">Concept generator</h3>
         <p class="note" style="margin:4px 0 12px">10 insider-joke ideas for one niche. Tap "Use" to fill the form.</p>
@@ -270,6 +260,16 @@
         <button id="cBtn" class="btn-sec" type="button">Generate 10 concepts</button>
         <div id="concepts"></div>
       </div>
+
+      <div class="out-head" id="resultsHead">
+        <h2>Results</h2>
+        <span id="count"></span>
+      </div>
+      <div id="empty" class="empty">
+        <strong>No designs yet</strong>
+        Choose a niche and an idea, then generate.
+      </div>
+      <div id="results" class="grid"></div>
 
       <div id="historyWrap" class="history" hidden>
         <h3>This session</h3>
@@ -629,6 +629,7 @@ function buildPrompt(){
 }
 
 /* ---------- generation ---------- */
+const GEN_COUNT = 4;
 let generating = false, total = 0;
 const history = [];
 
@@ -642,9 +643,10 @@ $('#genBtn').onclick = async () => {
   const btn = $('#genBtn'); btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>Generating…';
   $('#empty').hidden = true;
+  $('#resultsHead').scrollIntoView({ behavior:'smooth', block:'start' });
 
   const slots = [];
-  for(let i=0;i<2;i++){
+  for(let i=0;i<GEN_COUNT;i++){
     const d = document.createElement('div');
     d.className = 'card';
     d.dataset.text = $('#exactText').value.trim();
@@ -667,7 +669,7 @@ $('#genBtn').onclick = async () => {
   for(let i=0;i<slots.length;i++){
     results.push(await genOne(prompt, slots[i], i, ideaVal, productLabel, styleLabel));
   }
-  generating = false; btn.disabled = false; btn.textContent = 'Generate 2 designs';
+  generating = false; btn.disabled = false; btn.textContent = `Generate ${GEN_COUNT} designs`;
   const failed = results.filter(r => !r.ok);
   if(failed.some(r => r.limit)) toast('Daily limit reached — come back tomorrow', true);
   else if(failed.length) toast(failed.length + ' design(s) failed — try again', true);
