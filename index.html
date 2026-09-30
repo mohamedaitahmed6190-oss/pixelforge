@@ -1,1 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelForge Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Cinzel:wght@800&family=Creepster&family=Fredoka:wght@600&family=Great+Vibes&family=Lobster&family=Luckiest+Guy&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@800&family=Righteous&family=Rye&family=Satisfy&family=Shrikhand&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
+<style>
+  :root{
+    --paper:#F2F3F6; --surface:#FFFFFF; --ink:#16181D; --muted:#5F6570;
+    --line:#E1E4EA; --accent:#2F4BFF; --accent-dark:#1E33C7;
+    --radius-lg:20px; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5}
+  h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;margin:0;letter-spacing:-.02em}
+  button,input,select{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+  .bar{background:var(--ink);color:#fff}
+  .bar-in{max-width:1200px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:center;gap:10px;font-family:'Bricolage Grotesque';font-weight:800;font-size:19px}
+  .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;font-size:13px}
+  .bar small{color:#A9AEB8;font-size:13px}
+
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+  .intro h1{font-size:clamp(28px,4vw,40px);font-weight:800}
+  .intro p{color:var(--muted);margin:6px 0 0;max-width:60ch}
+
+  .layout{display:grid;grid-template-columns:360px 1fr;gap:24px;margin-top:24px;align-items:start}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px;position:sticky;top:16px}
+  @media(max-width:900px){.panel{position:static}}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+  .field .hint{font-weight:400;color:var(--muted)}
+  select,input[type=text]{width:100%;border:1px solid var(--line);background:#FAFBFC;border-radius:var(--radius);padding:11px 12px;font-size:14px;outline:none;transition:border-color .15s}
+  select:focus,input:focus{border-color:var(--accent);background:#fff}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .divider{height:1px;background:var(--line);margin:18px 0}
+  .gen{width:100%;border:0;border-radius:14px;background:var(--accent);color:#fff;font-weight:600;font-size:16px;padding:14px;cursor:pointer;transition:background .15s}
+  .gen:hover{background:var(--accent-dark)}
+  .gen:disabled{opacity:.55;cursor:not-allowed}
+  .note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+
+  .out-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  .out-head h2{font-size:22px}
+  .out-head span{color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  .empty{border:2px dashed var(--line);border-radius:var(--radius-lg);padding:48px 20px;text-align:center;color:var(--muted)}
+  .empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px}
+  .img-box{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;overflow:hidden;
+    background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
+  .img-box img{width:100%;height:100%;object-fit:contain}
+  .img-box.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
+  .status{font-size:12.5px;color:var(--muted);text-align:center;padding:0 12px}
+  .status.err{color:#C62828;font-weight:600}
+  .btn-sec{width:100%;margin-top:8px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;font-size:14px;cursor:pointer}
+  .btn-sec:hover:not(:disabled){border-color:var(--ink)}
+  .btn-sec:disabled{opacity:.45;cursor:not-allowed}
+
+  .btn-kit{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .btn-kit:hover:not(:disabled){background:#000}
+  .kit{display:none;margin-top:8px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:#FAFBFC}
+  .kit.show{display:block}
+  .kit p{margin:0 0 4px;font-size:12.5px;color:var(--muted)}
+  .kit p strong{color:var(--ink)}
+  a.btn-sec{display:block;text-align:center;text-decoration:none;color:var(--ink)}
+  .meta{font-size:12.5px;margin-top:10px;display:none}
+  .meta.show{display:block}
+  .meta .t{font-weight:600;font-size:13.5px}
+  .meta p{margin:6px 0;color:var(--muted)}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+  .tag{background:var(--paper);border-radius:6px;padding:3px 7px;font-size:12px}
+  .copy-row{display:flex;gap:6px;align-items:flex-start;justify-content:space-between}
+  .mini{border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 8px;font-size:11.5px;cursor:pointer;flex-shrink:0}
+
+  .history{margin-top:32px}
+  .history h3{font-size:17px;margin-bottom:10px}
+  .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
+  .hgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer}
+
+  .spin{width:20px;height:20px;border:2.5px solid #D6DAE2;border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;display:inline-block;vertical-align:-5px}
+  .gen .spin{border-color:rgba(255,255,255,.35);border-top-color:#fff;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+
+  .check{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:-4px 0 12px;cursor:pointer}
+  .check input{margin-top:3px;accent-color:var(--accent)}
+  .btn-text{border-color:var(--accent);color:var(--accent)}
+  .ed{position:fixed;inset:0;background:rgba(10,12,16,.6);z-index:60;overflow-y:auto;padding:14px}
+  .ed[hidden]{display:none}
+  .ed-box{max-width:520px;margin:0 auto;background:#fff;border-radius:20px;padding:16px}
+  .ed-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .ed-head h3{font-size:19px}
+  .ed canvas{width:100%;height:auto;display:block;border-radius:12px;
+    background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
+  .ed canvas.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
+  .seg{display:flex;gap:6px;margin:12px 0}
+  .seg button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
+  .seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  input[type=color]{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px;cursor:pointer}
+  .cpick{display:flex;gap:8px}
+  .cpick input[type=color]{width:52px;flex:none}
+  .cpick input[type=text]{flex:1;font-family:ui-monospace,monospace;text-transform:uppercase}
+  .swatches{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:50}
+  .toast.err{background:#C62828}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:0 20px 30px}
+  footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-in">
+    <div class="logo"><span class="mark">pf</span>PixelForge</div>
+    <small>Private studio</small>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <h1>Design studio</h1>
+    <p>Pick a niche, choose an idea, and generate print-ready transparent PNGs for your POD store.</p>
+  </div>
+
+  <div class="layout">
+    <aside class="panel">
+      <div class="row2">
+        <div class="field">
+          <label for="product">Product</label>
+          <select id="product">
+            <option value="t-shirt graphic, centered composition">T-shirt</option>
+            <option value="hoodie graphic, bold centered design">Hoodie</option>
+            <option value="mug wrap design, seamless horizontal composition">Mug wrap</option>
+            <option value="die-cut sticker design, thick white border">Sticker</option>
+            <option value="tote bag print design, minimalist composition">Tote bag</option>
+            <option value="phone case graphic, vertical composition">Phone case</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="style">Style</label>
+          <select id="style">
+            <optgroup label="Artistic (hand-made look)">
+              <option value="hand-drawn pen and ink illustration, expressive confident linework, visible sketch lines, cross-hatching shading, artist sketchbook feel, not cartoon, not clipart">Ink sketch</option>
+              <option value="expressive oil painting, thick impasto brush strokes, rich painterly texture, gallery artwork, not cartoon, not clipart">Oil painting</option>
+              <option value="gouache painting, visible opaque brush strokes, matte hand-painted texture, rich muted colors, not cartoon, not clipart">Gouache</option>
+              <option value="loose watercolor painting, wet-on-wet blooms, visible paper grain, delicate ink outlines, hand-painted, not cartoon, not clipart">Watercolor</option>
+              <option value="linocut block print, bold hand-carved lines, imperfect ink texture, artisan printmaking, 2 ink colors, not cartoon, not clipart">Linocut print</option>
+              <option value="ukiyo-e japanese woodblock print style, flowing hand-carved lines, traditional flat colors, subtle paper texture, not cartoon">Woodblock (ukiyo-e)</option>
+              <option value="charcoal and soft pastel drawing, smudged shading, expressive hand strokes, fine art drawing, not cartoon, not clipart">Charcoal & pastel</option>
+              <option value="dotwork stipple illustration, thousands of fine hand-inked dots, tattoo artist technique, high detail, not cartoon">Dotwork stipple</option>
+              <option value="vintage scientific naturalist illustration, fine engraving lines and stippling, hand-tinted watercolor, 19th century art, not cartoon">Vintage naturalist</option>
+              <option value="classic engraving illustration, fine crosshatching, intricate linework, not cartoon">Engraving</option>
+              <option value="risograph print illustration, grainy ink texture, 2-3 overlapping ink colors, slight misregistration, indie art print, not cartoon">Risograph</option>
+              <option value="american traditional tattoo flash art, bold hand-inked black outlines, limited vintage palette, tattoo artist style">Tattoo flash</option>
+              <option value="fine art digital painting, painterly brushwork, rich detail, not cartoon, not clipart">Fine art painterly</option>
+              <option value="surreal fine art illustration, dreamlike atmosphere, painterly detail, not cartoon">Surreal</option>
+            </optgroup>
+            <optgroup label="Works on light AND dark shirts">
+              <option data-universal="1" value="bold sticker style illustration that works on both white and black t-shirts, mid-tone saturated colors like orange, teal, red and yellow, very thick black outlines around every shape, no pure white areas, no large black areas, flat colors with simple shading">Universal sticker (any tee)</option>
+            </optgroup>
+            <optgroup label="For dark shirts (black, red, purple…)">
+              <option data-dark="1" value="bold screen print illustration made for dark t-shirts, bright saturated colors, thick white outlines, white text, no black outlines, no dark colors">Bright screen print (dark tee)</option>
+              <option data-dark="1" value="white ink illustration made for black t-shirts, white and cream linework only, crosshatching in white, chalky texture, no black lines">White ink sketch (dark tee)</option>
+              <option data-dark="1" value="glowing neon line art illustration, bright neon pink, cyan, yellow and white light lines, glow effect, no black elements">Neon glow (dark tee)</option>
+              <option data-dark="1" value="traditional tattoo flash art made for dark shirts, bright colors with thick white and cream outlines instead of black outlines">Tattoo flash (dark tee)</option>
+              <option data-dark="1" value="vintage distressed retro illustration made for dark shirts, cream, mustard, orange and teal ink, white outlines, faded worn print texture, no black">Vintage distressed (dark tee)</option>
+              <option data-dark="1" value="retro 80s synthwave illustration, glowing hot pink, purple and cyan, sunset and grid, bright colors, no black elements">Synthwave (dark tee)</option>
+              <option data-dark="1" value="chalkboard style hand lettering and illustration in white and pastel chalk, dusty chalk texture, no black">Chalk lettering (dark tee)</option>
+            </optgroup>
+            <optgroup label="Graphic & flat">
+              <option value="vintage retro badge illustration, distressed texture, limited color palette">Vintage badge</option>
+              <option value="bold screen print illustration, thick outlines, 3-4 flat spot colors">Screen print</option>
+              <option value="elegant hand-lettered typography design, decorative script">Typography</option>
+              <option value="flat vector illustration, clean geometric shapes, solid flat colors, no gradients, no texture, limited palette of 5 colors">Flat vector</option>
+              <option value="realistic digital illustration, dramatic lighting, fine detail">Realistic</option>
+              <option value="cute kawaii illustration, soft pastel colors, rounded shapes">Cute kawaii</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="niche">Niche</label>
+        <select id="niche"></select>
+      </div>
+
+      <div class="field">
+        <label for="suggest">Idea</label>
+        <select id="suggest"></select>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label for="idea">Description <span class="hint">(edit freely)</span></label>
+        <input id="idea" type="text">
+      </div>
+
+      <div class="field">
+        <label for="exactText">Text on design <span class="hint">(empty = no text)</span></label>
+        <input id="exactText" type="text" placeholder="e.g. Reel Cool Dad">
+      </div>
+
+      <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
+
+      <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
+
+      <button id="genBtn" class="gen">Generate 2 designs</button>
+      <p class="note">Keep text to 1–4 words for clean lettering. Always check spelling before uploading.</p>
+      <style>
+        .tool-title{font-size:17px;margin:0}
+        .concept{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px;background:#FAFBFC}
+        .concept .ct{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px}
+        .concept p{margin:4px 0;font-size:13px;color:var(--muted)}
+        .concept p strong{color:var(--ink);font-weight:600}
+        .concept .row{display:flex;gap:6px;margin-top:8px}
+        .concept .row .btn-sec{margin-top:0}
+      </style>
+      <div class="divider"></div>
+      <h3 class="tool-title">Concept generator</h3>
+      <p class="note" style="margin:4px 0 12px">10 insider-joke ideas for one niche. Tap "Use" to fill the form.</p>
+      <div class="field">
+        <label for="cPick">Popular niches <span class="hint">(pick one, or type below)</span></label>
+        <select id="cPick"><option value="">— Choose a niche —</option></select>
+      </div>
+      <div class="field">
+        <label for="cNiche">Niche</label>
+        <input id="cNiche" type="text" placeholder="e.g. ER nurses, sourdough bakers, pitbull moms">
+      </div>
+      <div class="field">
+        <label for="cSeason">Season</label>
+        <select id="cSeason">
+          <option value="">None (evergreen)</option>
+          <option>Halloween</option>
+          <option>Thanksgiving</option>
+          <option>Christmas</option>
+          <option>Valentine's Day</option>
+          <option>Mother's Day</option>
+          <option>Father's Day</option>
+          <option>Summer</option>
+          <option>Back to school</option>
+        </select>
+      </div>
+      <button id="cBtn" class="btn-sec" type="button">Generate 10 concepts</button>
+      <div id="concepts"></div>
+
+    </aside>
+
+    <section>
+      <div class="out-head">
+        <h2>Results</h2>
+        <span id="count"></span>
+      </div>
+      <div id="empty" class="empty">
+        <strong>No designs yet</strong>
+        Choose a niche and an idea, then generate.
+      </div>
+      <div id="results" class="grid"></div>
+
+      <div id="historyWrap" class="history" hidden>
+        <h3>This session</h3>
+        <div id="history" class="hgrid"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="ed" class="ed" hidden>
+  <div class="ed-box">
+    <div class="ed-head"><h3>Add text</h3><button id="edClose" class="mini" type="button">✕ Close</button></div>
+    <canvas id="edCanvas" width="600" height="660"></canvas>
+    <div class="seg"><button type="button" data-line="top" class="on">Top line</button><button type="button" data-line="bottom">Bottom line</button></div>
+    <div class="field"><label for="edText">Text</label><input id="edText" type="text" placeholder="Leave empty for no text"></div>
+    <div class="field"><label for="edFont">Font</label><select id="edFont"></select></div>
+    <div class="field"><label for="edHex">Color <span class="hint">(tap a swatch or type a code like #E63946)</span></label>
+      <div class="cpick"><input id="edColor" type="color" aria-label="Pick color"><input id="edHex" type="text" maxlength="7" placeholder="#FFFFFF"></div>
+      <div class="swatches" id="swLine"></div>
+    </div>
+    <div class="field"><label for="edSize">Size</label><input id="edSize" type="range" min="30" max="260"></div>
+    <div class="field"><label for="edArc">Curve <span class="hint">(left = smile, right = rainbow)</span></label><input id="edArc" type="range" min="-100" max="100"></div>
+    <div class="field"><label for="edY">Position (up / down)</label><input id="edY" type="range" min="40" max="1060"></div>
+    <div class="field"><label for="edX">Position (left / right)</label><input id="edX" type="range" min="-500" max="500"></div>
+    <div class="divider"></div>
+    <div class="field"><label for="edStrokeHex">Outline color</label>
+      <div class="cpick"><input id="edStroke" type="color" aria-label="Pick outline color"><input id="edStrokeHex" type="text" maxlength="7" placeholder="#000000"></div>
+      <div class="swatches" id="swStroke"></div>
+    </div>
+    <div class="field"><label for="edSW">Outline width</label><input id="edSW" type="range" min="0" max="20"></div>
+    <div class="field"><label for="edImgS">Picture size</label><input id="edImgS" type="range" min="30" max="100"></div>
+    <div class="field"><label for="edImgY">Picture position</label><input id="edImgY" type="range" min="-300" max="300"></div>
+    <button id="edApply" class="gen" type="button">Apply to design</button>
+    <button id="edApplyDl" class="btn-sec" type="button">Apply & download PNG</button>
+  </div>
+</div>
+
+<footer><a href="/api/generate?prompt=apple" target="_blank">Test API</a></footer>
+
+<script>
+const $ = s => document.querySelector(s);
+
+/* ---------- niches: [description, text on design] ---------- */
+const NICHES = [
+  { name:'Halloween', hot:true, ideas:[
+    ['black cat sitting on a carved pumpkin, spooky night','Stay Spooky'],
+    ['vintage witch hat with crescent moon and bats','Resting Witch Face'],
+    ['skeleton holding a coffee cup','Dead Inside But Caffeinated'],
+    ['cute retro ghost wearing sunglasses','Boo Crew'],
+    ['haunted house under a full moon',''],
+    ['cute ghost reading a book','Booooks'],
+    ['retro candy corn and pumpkins badge','Trick or Treat'],
+    ['black cat in a witch hat',''] ]},
+  { name:'Fall & autumn', hot:true, ideas:[
+    ['pumpkin spice latte surrounded by autumn leaves','Pumpkin Spice Season'],
+    ['cozy bonfire in the mountains with pine trees','Sweater Weather'],
+    ['autumn leaves wreath','Hello Fall'],
+    ['vintage pickup truck carrying pumpkins','Fall Vibes'],
+    ['retro sunset over an autumn forest','Cozy Season'],
+    ['hay bales, sunflowers and pumpkins on a farm','Harvest Season'],
+    ['highland cow wearing a knitted scarf with fall leaves',''],
+    ['mushrooms and acorns on a forest floor',''] ]},
+  { name:'Thanksgiving', hot:true, ideas:[
+    ['funny turkey wearing a pilgrim hat','Gobble Gobble'],
+    ['slice of pumpkin pie with whipped cream','Here For The Pie'],
+    ['wheat and autumn leaves wreath','Thankful Grateful Blessed'],
+    ['funny turkey running in sneakers','Turkey Trot'],
+    ['retro pumpkin pie badge','Pie Squad'],
+    ['autumn harvest table with pumpkins','Thankful'] ]},
+  { name:'Christmas', hot:true, ideas:[
+    ['cozy cabin in a snowy pine forest','Merry & Bright'],
+    ['vintage red truck carrying a Christmas tree','Merry Christmas'],
+    ['gingerbread man cookie with a bite missing','Oh Snap'],
+    ['cat tangled in Christmas lights','Meowy Christmas'],
+    ['snowman wearing a scarf',''],
+    ['nutcracker soldier',''],
+    ['dog wearing a Santa hat','Dear Santa, Define Good'],
+    ['hot cocoa mug with marshmallows','Cocoa Season'] ]},
+  { name:'Fishing', ideas:[
+    ['largemouth bass jumping out of the water','Reel Cool Dad'],
+    ['collection of vintage fishing lures','Hooked On Fishing'],
+    ['man fishing from a boat on a lake at sunrise','Lake Life'],
+    ['rainbow trout',''],
+    ['fishing rod and tackle box',"I'd Rather Be Fishing"],
+    ['retro fishing boat on calm water','Weekend Forecast: Fishing'],
+    ['fly fisherman in a mountain river',''],
+    ['grandpa and grandson fishing on a dock','Fishing Buddies'] ]},
+  { name:'Hunting & outdoors', ideas:[
+    ['whitetail buck with big antlers in front of mountains','Buck Wild'],
+    ['mallard ducks flying over a marsh','Duck Season'],
+    ['bull elk bugling in a forest','Wild And Free'],
+    ['black bear walking through pine trees','Go Outside'],
+    ['vintage compass with mountain range','Adventure Awaits'],
+    ['wild turkey strutting',''] ]},
+  { name:'Camping & hiking', ideas:[
+    ['campfire under a starry night sky','Camp Life'],
+    ['tent in front of mountains','Happy Camper'],
+    ['retro RV camper at sunset','Home Is Where We Park It'],
+    ['hiking boots on a mountain trail','Take A Hike'],
+    ['mountain range with a full moon','The Mountains Are Calling'],
+    ['camper van on a desert road at sunset','Van Life'],
+    ['bear drinking coffee by a campfire',''],
+    ['marshmallow roasting on a campfire, cute',''] ]},
+  { name:'Dog lovers', ideas:[
+    ['golden retriever portrait with flowers','Dog Mom'],
+    ['dachshund wearing a cozy sweater',''],
+    ['paw print inside a heart','Dog Mama'],
+    ['dog holding a coffee cup','Dogs And Coffee'],
+    ['pit bull wearing a flower crown','Pittie Mom'],
+    ['corgi from behind, cute',''],
+    ['bearded man hugging his dog','Dog Dad'],
+    ['rescue dog with a heart',"Adopt Don't Shop"] ]},
+  { name:'Cat lovers', ideas:[
+    ['black cat sitting in front of the moon',''],
+    ['cat drinking coffee','Cats & Coffee'],
+    ['cat reading a book','Cat Lady'],
+    ['kitten sitting in a teacup',''],
+    ['grumpy cat sitting','Nope'],
+    ['cat surrounded by flowers','Cat Mom'],
+    ['cat astronaut floating in space',''],
+    ['cat sleeping on a stack of books','Nap Queen'] ]},
+  { name:'Nurse & healthcare', ideas:[
+    ['stethoscope forming a heart','Nurse Life'],
+    ['coffee cup with an IV bag','Powered By Coffee'],
+    ['stethoscope with flowers','Registered Nurse'],
+    ['heartbeat line','ER Nurse'],
+    ['nurse with a cape, strong pose','Nurse Strong'],
+    ['tiny baby footprints with a heart','L&D Nurse'] ]},
+  { name:'Teacher', ideas:[
+    ['red apple and pencil','Teach Love Inspire'],
+    ['retro yellow school bus','Teacher Life'],
+    ['stack of books and coffee','Coffee Teach Repeat'],
+    ['chalkboard with flowers','Teaching Is My Superpower'],
+    ['rainbow made of pencils','Kindergarten Teacher'],
+    ['backpack and apple','Back To School'] ]},
+  { name:'Mom life', ideas:[
+    ['coffee mug and messy bun','Mom Life'],
+    ['wildflowers bouquet','Mama'],
+    ['tired mom with coffee, funny','Running On Coffee'],
+    ['sports balls and a heart','Boy Mom'],
+    ['bows and flowers','Girl Mom'],
+    ['retro sunset badge','Blessed Mama'] ]},
+  { name:'Dad life', ideas:[
+    ['barbecue grill with flames','Grill Master'],
+    ['funny dad with a beer belly','Dad Bod'],
+    ['crossed wrenches and tools','Dad Can Fix It'],
+    ['lawn mower, funny','Lawn Enforcement'],
+    ['loading bar, funny','Dad Joke Loading'],
+    ['vintage badge with mountains','Best Dad Ever'] ]},
+  { name:'Coffee lovers', ideas:[
+    ['vintage coffee cup with steam','But First Coffee'],
+    ['skull made of coffee beans','Death Before Decaf'],
+    ['iced coffee cup','Iced Coffee Addict'],
+    ['vintage espresso machine',''],
+    ['coffee cup with flowers','Coffee & Kindness'],
+    ['sleepy sloth holding coffee',''] ]},
+  { name:'Gaming', ideas:[
+    ['retro game controller','Game On'],
+    ['pixel art heart','Player 1'],
+    ['skull wearing a gaming headset',''],
+    ['retro arcade machine','Retro Gamer'],
+    ['game controller with lightning','Gamer Mode'],
+    ['pixel art sword',''] ]},
+  { name:'Gym & fitness', ideas:[
+    ['dumbbell with flames','Lift Heavy'],
+    ['barbell and skull',''],
+    ['running shoes','Miles And Smiles'],
+    ['kettlebell','Strong Is Beautiful'],
+    ['yoga pose silhouette with flowers','Namaste'],
+    ['muscular gorilla lifting weights','Leg Day'] ]},
+  { name:'Faith', ideas:[
+    ['cross with flowers','Faith Over Fear'],
+    ['mountains at sunrise','Blessed'],
+    ['dove with olive branch',''],
+    ['lion and lamb together',''],
+    ['mustard seed and mountains','Faith Can Move Mountains'],
+    ['praying hands','Pray More Worry Less'] ]},
+  { name:'Mental health', ideas:[
+    ['brain with flowers growing','Be Kind To Your Mind'],
+    ['sunflower','You Are Enough'],
+    ['butterfly','Grow Through It'],
+    ['small plant growing from a pot',"It's Okay Not To Be Okay"],
+    ['hands forming a heart','Choose Kindness'],
+    ['moon and stars','Rest Is Productive'] ]},
+  { name:'Bookish', ideas:[
+    ['stack of books with flowers','Just One More Chapter'],
+    ['cat reading a book','Bookworm'],
+    ['old library, dark academia',''],
+    ['coffee and an open book','Books & Coffee'],
+    ['book with flowers growing out','Book Lover'],
+    ['dragon reading a book',''] ]},
+  { name:'Plants & garden', ideas:[
+    ['monstera leaves','Plant Lady'],
+    ['succulents in pots','Plant Mom'],
+    ['vegetable garden','Grow Your Own'],
+    ['watering can with flowers','Garden Therapy'],
+    ['vintage botanical flowers',''],
+    ['bee and wildflowers','Save The Bees'] ]},
+  { name:'Retro & vintage', ideas:[
+    ['retro sunset over mountains',''],
+    ['vintage motorcycle','Ride Free'],
+    ['classic muscle car','Old School'],
+    ['retro 70s waves and sun','Good Vibes'],
+    ['vintage desert travel poster',''],
+    ['retro cassette tape',''] ]},
+  { name:'Western', ideas:[
+    ['cowboy boots with flowers','Howdy'],
+    ['desert cactus at sunset','Wild West'],
+    ['horse running','Cowgirl'],
+    ['cowboy hat and lasso','Rodeo'],
+    ['bull skull with flowers',''],
+    ['cowboy riding a horse','Giddy Up'] ]},
+  { name:'Cottagecore & witchy', ideas:[
+    ['mushroom forest',''],
+    ['frog wearing a mushroom hat',''],
+    ['moth and crescent moon',''],
+    ['crystal ball with stars','Witchy Vibes'],
+    ['herb jars and dried flowers',''],
+    ['snail on a mushroom',''] ]},
+  { name:'Celestial & zodiac', ideas:[
+    ['sun and moon faces',''],
+    ['zodiac constellation wheel',''],
+    ['moon phases',''],
+    ['celestial hand with an eye',''],
+    ['astronaut floating among planets',''],
+    ['tarot card with the sun',''] ]},
+  { name:'Sports', ideas:[
+    ['crossed pickleball paddles','Pickleball Addict'],
+    ['retro pickleball badge','Dink Responsibly'],
+    ['golf ball and clubs','Golf Dad'],
+    ['baseball with a heart','Baseball Mom'],
+    ['soccer ball','Soccer Mom'],
+    ['basketball going through a hoop',''] ]},
+  { name:'Trucker & mechanic', ideas:[
+    ['semi truck on a highway at sunset','Trucker Life'],
+    ['wrench and gear','Mechanic'],
+    ['vintage pickup truck',''],
+    ['crossed pistons and wrenches','Grease Monkey'],
+    ['v8 engine',''],
+    ['tow truck',''] ]}
+];
+
+/* ---------- niche & idea selects (+ your own saved ideas) ---------- */
+const CUSTOM_KEY = 'pf_custom_ideas';
+function loadCustom(){ try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '{}'); } catch(e){ return {}; } }
+function saveCustom(o){ try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(o)); } catch(e){} }
+
+const nicheSel = $('#niche'), sugSel = $('#suggest');
+const gMine = document.createElement('optgroup'); gMine.label = 'Yours';
+const mine = document.createElement('option'); mine.value = 'mine'; mine.textContent = '✏️ My own ideas';
+gMine.appendChild(mine);
+const gHot = document.createElement('optgroup'); gHot.label = 'Trending this season';
+const gAll = document.createElement('optgroup'); gAll.label = 'Evergreen';
+NICHES.forEach((n, i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = (n.hot ? '🔥 ' : '') + n.name;
+  (n.hot ? gHot : gAll).appendChild(o);
+});
+nicheSel.append(gMine, gHot, gAll);
+nicheSel.value = '0';
+
+function nicheName(){ return nicheSel.value === 'mine' ? 'My own ideas' : NICHES[nicheSel.value].name; }
+function customList(){ return loadCustom()[nicheName()] || []; }
+function builtinList(){ return nicheSel.value === 'mine' ? [] : NICHES[nicheSel.value].ideas; }
+
+function fillIdeas(selectValue){
+  sugSel.innerHTML = '';
+  const add = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sugSel.appendChild(o); };
+  add('new', '✏️ Write my own idea');
+  customList().forEach(([d, t], i) => add('c' + i, '⭐ ' + (t ? `${d} — "${t}"` : `${d} (no text)`)));
+  builtinList().forEach(([d, t], i) => add('b' + i, t ? `${d} — "${t}"` : `${d} (no text)`));
+  sugSel.value = selectValue || (sugSel.options.length > 1 ? sugSel.options[1].value : 'new');
+  applyIdea();
+}
+function applyIdea(){
+  const v = sugSel.value;
+  if(v === 'new'){
+    $('#idea').value = ''; $('#exactText').value = '';
+    $('#idea').placeholder = 'Describe your design, e.g. bulldog wearing sunglasses';
+    $('#idea').focus();
+    return;
+  }
+  const [d, t] = (v[0] === 'c' ? customList() : builtinList())[+v.slice(1)];
+  $('#idea').value = d;
+  $('#exactText').value = t;
+}
+nicheSel.onchange = () => fillIdeas();
+sugSel.onchange = applyIdea;
+
+$('#saveIdea').onclick = () => {
+  const d = $('#idea').value.trim(), t = $('#exactText').value.trim();
+  if(!d){ toast('Write a description first', true); $('#idea').focus(); return; }
+  const all = loadCustom(), name = nicheName();
+  const list = all[name] || [];
+  let i = list.findIndex(x => x[0] === d && x[1] === t);
+  if(i === -1){ list.unshift([d, t]); i = 0; }
+  all[name] = list; saveCustom(all);
+  fillIdeas('c' + i);
+  toast(`Saved to ${name}`);
+};
+fillIdeas();
+
+/* ---------- prompt builder ---------- */
+function isDark(){ return $('#style').selectedOptions[0].dataset.dark === '1'; }
+function isUniversal(){ return $('#style').selectedOptions[0].dataset.universal === '1'; }
+// adds a white sticker border around the artwork so it also shows on black shirts
+function haloCanvas(c, r){
+  const sil = document.createElement('canvas'); sil.width = c.width; sil.height = c.height;
+  const sx = sil.getContext('2d'); sx.drawImage(c, 0, 0);
+  sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#FFFFFF'; sx.fillRect(0, 0, sil.width, sil.height);
+  const out = document.createElement('canvas'); out.width = c.width; out.height = c.height;
+  const o = out.getContext('2d');
+  [r, r * 0.5].forEach(rad => {
+    for(let a = 0; a < 36; a++){ const t = a / 36 * Math.PI * 2; o.drawImage(sil, Math.cos(t) * rad, Math.sin(t) * rad); }
+  });
+  o.drawImage(c, 0, 0);
+  return out;
+}
+function addHalo(url){
+  return new Promise(resolve => {
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+        c.getContext('2d').drawImage(img, 0, 0);
+        haloCanvas(c, Math.round(c.width * 0.012)).toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
+      } catch(e){ resolve(url); }
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+// true when a pixel is background: near-white (light designs) or near-black (dark-shirt designs)
+function isBgPixel(d, i, dark){
+  return dark ? (d[i] < 28 && d[i+1] < 28 && d[i+2] < 28) : (d[i] > 235 && d[i+1] > 235 && d[i+2] > 235);
+}
+function buildPrompt(){
+  const product = $('#product').value, style = $('#style').value;
+  const idea = $('#idea').value.trim() || 'retro sunset over mountains';
+  const text = $('#exactText').value.trim();
+  const later = $('#textLater').checked && text;
+  const textRule = later
+    ? `No text, no letters, no words anywhere in the design. The subject is centered and fills only the middle 60% of the canvas, leaving clean empty space above and below it. `
+    : text
+    ? `The design must contain ONLY this exact text: "${text}". Spell it exactly as written, correct spelling, every letter present, no missing letters, no extra words, no other text. `
+    : `No text, no letters, no words anywhere in the design. `;
+  const bg = isDark()
+    ? `subject isolated on a solid pure black background with no shadows and no background scenery; the artwork itself uses NO black: all outlines, shading and text are white, cream or bright colors so it prints on a black shirt, `
+    : `subject isolated on a solid plain white background with no shadows and no background scenery, `;
+  return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. Style: ${style}. ` +
+    `Requirements: high contrast, no watermark, clean crisp edges, ` + bg +
+    `professional illustration quality. Square 1:1 composition.`;
+}
+
+/* ---------- generation ---------- */
+let generating = false, total = 0;
+const history = [];
+
+$('#genBtn').onclick = async () => {
+  if(generating) return;
+  const prompt = buildPrompt();
+  const ideaVal = $('#idea').value.trim();
+  const productLabel = $('#product').selectedOptions[0].text;
+  const styleLabel = $('#style').selectedOptions[0].text;
+  generating = true;
+  const btn = $('#genBtn'); btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Generating…';
+  $('#empty').hidden = true;
+
+  const slots = [];
+  for(let i=0;i<2;i++){
+    const d = document.createElement('div');
+    d.className = 'card';
+    d.dataset.text = $('#exactText').value.trim();
+    d.dataset.dark = isDark() ? '1' : '';
+    d.dataset.universal = isUniversal() ? '1' : '';
+    d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
+    d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
+      <button class="btn-sec btn-kit kitBtn" disabled>🚀 TeePublic kit</button>
+      <div class="kit"></div>
+      <button class="btn-sec btn-text txtBtn" disabled>✏️ Add text</button>
+      <button class="btn-sec dlBtn" disabled>Download PNG</button>
+      <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
+      <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
+      <button class="btn-sec metaBtn" disabled>Write listing</button>
+      <div class="meta"></div>`;
+    $('#results').prepend(d);
+    slots.push(d);
+  }
+  const results = [];
+  for(let i=0;i<slots.length;i++){
+    results.push(await genOne(prompt, slots[i], i, ideaVal, productLabel, styleLabel));
+  }
+  generating = false; btn.disabled = false; btn.textContent = 'Generate 2 designs';
+  const failed = results.filter(r => !r.ok);
+  if(failed.some(r => r.limit)) toast('Daily limit reached — come back tomorrow', true);
+  else if(failed.length) toast(failed.length + ' design(s) failed — try again', true);
+};
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
+  const box = slot.querySelector('.img-box');
+  const dl = slot.querySelector('.dlBtn');
+  const seed = Date.now() + idx * 7919;
+  const fullPrompt = `${prompt} (variation ${idx+1}: slightly different composition/colors)`;
+
+  const w = await tryWorkersAI(fullPrompt, seed, box);
+  if(w && w.url) return finishSlot(w.url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
+
+  const poll = await tryPollinations(fullPrompt, seed, box);
+  if(poll) return finishSlot(poll, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
+
+  const limit = !!(w && w.limit);
+  box.innerHTML = `<div class="status err">${limit ? 'Daily limit reached. Come back tomorrow.' : 'Generation failed. Try again in a minute.'}</div>`;
+  return { ok:false, limit };
+}
+
+async function tryWorkersAI(fullPrompt, seed, box){
+  try {
+    box.innerHTML = '<span class="spin"></span>';
+    const r = await fetch(`/api/generate?prompt=${encodeURIComponent(fullPrompt)}&seed=${seed}`, { cache:'no-store' });
+    if(r.status === 429) return { limit:true };
+    if(!r.ok){ console.warn('Workers AI error', r.status, await r.text().catch(()=> '')); return null; }
+    const blob = await r.blob();
+    if(!blob.type.startsWith('image/') || blob.size < 500) return null;
+    return { url: URL.createObjectURL(blob) };
+  } catch(e){ return null; }
+}
+
+function loadAsImage(url, timeoutMs){
+  return new Promise((resolve) => {
+    const img = new Image(); let done = false;
+    const finish = ok => { if(!done){ done = true; resolve(ok ? url : null); } };
+    img.onload = () => finish(true); img.onerror = () => finish(false);
+    setTimeout(() => finish(false), timeoutMs);
+    img.src = url;
+  });
+}
+
+async function tryPollinations(fullPrompt, seed, box){
+  const models = ['flux', 'turbo'];
+  for(let a=0; a<models.length; a++){
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true&model=${models[a]}&referrer=pixelforge-app`;
+    box.innerHTML = `<div class="status">Trying backup generator (${a+1}/${models.length})…</div>`;
+    const ok = await loadAsImage(url, 25000);
+    if(ok) return ok;
+    if(a < models.length-1) await sleep(3000);
+  }
+  return null;
+}
+
+// near-white pixels → transparent
+function makeTransparent(url, dark){
+  return new Promise((resolve) => {
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
+        for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
+        ctx.putImageData(data, 0, 0);
+        c.toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
+      } catch(e){ resolve(url); }
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+
+async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel){
+  const dark = slot.dataset.dark === '1';
+  let finalUrl = await makeTransparent(url, dark);
+  if(slot.dataset.universal === '1') finalUrl = await addHalo(finalUrl);
+  if(dark) box.classList.add('dark');
+  box.innerHTML = `<img src="${finalUrl}" alt="Generated design">`;
+  slot._base = finalUrl;   // picture without added text
+  slot._url = finalUrl;    // current print file (with text once applied)
+  slot._idx = idx;
+  dl.disabled = false;
+  dl.onclick = () => download(slot._url, idx);
+  const txtBtn = slot.querySelector('.txtBtn');
+  txtBtn.disabled = false;
+  txtBtn.onclick = () => openEditor(slot);
+  const svgBtn = slot.querySelector('.svgBtn');
+  svgBtn.disabled = false;
+  svgBtn.onclick = () => downloadVectorPNG(finalUrl, idx, svgBtn);
+  const upBtn = slot.querySelector('.upBtn');
+  upBtn.disabled = false;
+  upBtn.onclick = () => downloadUpscaled(url, idx, upBtn, dark, slot.dataset.universal === '1');
+  const kitBtn = slot.querySelector('.kitBtn');
+  kitBtn.disabled = false;
+  kitBtn.onclick = () => teepublicKit(slot, slot._url, idx, ideaVal, productLabel, styleLabel);
+  const metaBtn = slot.querySelector('.metaBtn');
+  metaBtn.disabled = false;
+  metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
+  total++; $('#count').textContent = `${total} design${total>1?'s':''} this session`;
+  history.unshift({ url: finalUrl, prompt });
+  renderHistory();
+  return { ok:true };
+}
+
+/* ---------- print export 5000x5500 ---------- */
+const PRINT_W = 5000, PRINT_H = 5500;
+function loadImageEl(url){
+  return new Promise((res, rej) => { const i = new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+}
+async function download(url, idx, name){
+  try {
+    const img = await loadImageEl(url);
+    const c = document.createElement('canvas'); c.width = PRINT_W; c.height = PRINT_H;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    const s = img.naturalWidth === PRINT_W ? 1 : Math.min(PRINT_W/img.naturalWidth, PRINT_H/img.naturalHeight) * 0.92;
+    const w = img.naturalWidth*s, h = img.naturalHeight*s;
+    ctx.drawImage(img, (PRINT_W-w)/2, (PRINT_H-h)/2, w, h);
+    c.toBlob(b => {
+      if(!b){ toast('Export failed — try again', true); return; }
+      const u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = name || `pod-design-${Date.now()}-${idx+1}-5000x5500.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+    }, 'image/png');
+  } catch(e){
+    toast('Could not export at 5000×5500 — opening original', true);
+    window.open(url, '_blank');
+  }
+}
+
+/* ---------- vectorize → HD PNG (sharp edges at 5000x5500) ---------- */
+async function downloadVectorPNG(url, idx, btn){
+  if(!window.ImageTracer){ toast('Vector tool not loaded — refresh the page', true); return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
+  await sleep(50);
+  try {
+    // 1) trace the design into vector shapes
+    const img = await loadImageEl(url);
+    const size = 1024;
+    const c = document.createElement('canvas'); c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const s = Math.min(size/img.naturalWidth, size/img.naturalHeight);
+    const w = img.naturalWidth*s, h = img.naturalHeight*s;
+    ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+    let svg = ImageTracer.imagedataToSVG(ctx.getImageData(0, 0, size, size), {
+      numberofcolors: 24, colorsampling: 2, mincolorratio: 0,
+      ltres: 0.5, qtres: 0.5, pathomit: 8, blurradius: 0,
+      strokewidth: 0, roundcoords: 2, viewbox: true, desc: false
+    });
+    svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')
+             .replace('<svg ', `<svg width="${size}" height="${size}" `);
+
+    // 2) render the vector at print size → razor-sharp PNG
+    const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
+    const vec = await loadImageEl(svgUrl);
+    const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
+    const octx = out.getContext('2d');
+    const k = Math.min(PRINT_W/size, PRINT_H/size) * 0.92;
+    const dw = size*k, dh = size*k;
+    octx.drawImage(vec, (PRINT_W-dw)/2, (PRINT_H-dh)/2, dw, dh);
+    URL.revokeObjectURL(svgUrl);
+
+    await new Promise(res => out.toBlob(b => {
+      if(!b){ toast('Export failed — try again', true); return res(); }
+      const u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-HD-5000x5500.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+      res();
+    }, 'image/png'));
+  } catch(e){
+    toast('Vectorizing failed for this image — use the normal PNG', true);
+  }
+  btn.disabled = false; btn.textContent = 'HD PNG (vectorized)';
+}
+
+/* ---------- AI upscale (ESRGAN in the browser, free) ---------- */
+const UPSCALE_LIBS = [
+  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js',
+  'https://cdn.jsdelivr.net/npm/@upscalerjs/default-model@1.0.0/dist/umd/index.min.js',
+  'https://cdn.jsdelivr.net/npm/upscaler@1.0.0/dist/browser/umd/upscaler.min.js',
+  'https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@1.0.0/dist/umd/models/esrgan-slim/src/x2/index.min.js'
+];
+let upscaler = null;
+function loadScript(src){
+  return new Promise((res, rej) => {
+    if(document.querySelector(`script[src="${src}"]`)) return res();
+    const sc = document.createElement('script');
+    sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('Could not load ' + src));
+    document.head.appendChild(sc);
+  });
+}
+async function getUpscaler(){
+  if(upscaler) return upscaler;
+  for(const src of UPSCALE_LIBS) await loadScript(src);
+  upscaler = new Upscaler({ model: ESRGANSlim2x });
+  return upscaler;
+}
+// originalUrl = the image BEFORE background removal (AI needs the white background)
+async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Loading AI…';
+  try {
+    const up = await getUpscaler();
+    const img = await loadImageEl(originalUrl);
+    btn.innerHTML = '<span class="spin"></span> Upscaling 0%';
+    const src = await up.upscale(img, {
+      patchSize: 64, padding: 6,
+      progress: p => { btn.innerHTML = `<span class="spin"></span> Upscaling ${Math.round(p*100)}%`; }
+    });
+    btn.innerHTML = '<span class="spin"></span> Finishing…';
+    const big = await loadImageEl(src);
+
+    // remove white background at the upscaled size
+    const c = document.createElement('canvas');
+    c.width = big.naturalWidth; c.height = big.naturalHeight;
+    const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
+    for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
+    ctx.putImageData(data, 0, 0);
+
+    // place on the 5000x5500 print canvas
+    const out = document.createElement('canvas'); out.width = PRINT_W; out.height = PRINT_H;
+    const octx = out.getContext('2d'); octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'high';
+    const k = Math.min(PRINT_W/c.width, PRINT_H/c.height) * 0.92;
+    const dw = c.width*k, dh = c.height*k;
+    octx.drawImage(halo ? haloCanvas(c, Math.round(c.width * 0.012)) : c, (PRINT_W-dw)/2, (PRINT_H-dh)/2, dw, dh);
+
+    await new Promise(res => out.toBlob(b => {
+      if(!b){ toast('Export failed — try again', true); return res(); }
+      const u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-AI-upscaled-5000x5500.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+      res();
+    }, 'image/png'));
+  } catch(e){
+    console.warn(e);
+    toast('Upscale failed — try again or use HD PNG (vectorized)', true);
+  }
+  btn.disabled = false; btn.textContent = 'AI upscale (HD)';
+}
+
+/* ---------- SEO listing ---------- */
+async function getMeta(slot, idea, product, style){
+  if(slot._meta) return slot._meta;
+  const r = await fetch(`/api/metadata?idea=${encodeURIComponent(idea)}&text=${encodeURIComponent(slot.dataset.text || '')}&niche=${encodeURIComponent(slot.dataset.niche || '')}&product=${encodeURIComponent(product)}&style=${encodeURIComponent(style)}`, { cache:'no-store' });
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  slot._meta = d;
+  return d;
+}
+async function loadMetadata(slot, idea, product, style){
+  const btn = slot.querySelector('.metaBtn'), box = slot.querySelector('.meta');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Writing…';
+  try {
+    const d = await getMeta(slot, idea, product, style);
+    box.innerHTML = renderMetadata(d);
+    box.classList.add('show');
+    box.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(b.dataset.copy, b));
+    const all = `${d.title||''}\n\n${d.description||''}\n\nMain tag: ${d.main_tag||''}\nTags: ${(d.supporting_tags||[]).join(', ')}\nKeywords: ${(d.seo_keywords||[]).join(', ')}`;
+    box.querySelector('[data-all]').onclick = e => copyText(all, e.target);
+    btn.remove();
+  } catch(e){
+    toast('Could not write listing — try again', true);
+    btn.disabled = false; btn.textContent = 'Write listing';
+  }
+}
+/* ---------- TeePublic kit: PNG + listing fields + upload page ---------- */
+const TEEPUBLIC_UPLOAD_URL = 'https://www.teepublic.com/design/quick_create';
+async function teepublicKit(slot, finalUrl, idx, idea, product, style){
+  const btn = slot.querySelector('.kitBtn'), panel = slot.querySelector('.kit');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Preparing kit…';
+  try {
+    const d = await getMeta(slot, idea, product, style);
+    const slug = (d.title || 'design').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'design';
+    const file = `${slug}.png`;
+    download(finalUrl, idx, file);
+    const fields = [
+      ['Title', d.title || ''],
+      ['Description', d.description || ''],
+      ['Main tag', d.main_tag || ''],
+      ['Supporting tags', (d.supporting_tags || []).join(', ')]
+    ];
+    panel.innerHTML =
+      `<p>✓ <strong>${esc(file)}</strong> downloading</p>
+       <p><strong>Title:</strong> ${esc(d.title || '')}</p>` +
+      fields.map(([k], i) => `<button class="btn-sec" data-kit="${i}">Copy ${k}</button>`).join('') +
+      `<a class="btn-sec" href="${TEEPUBLIC_UPLOAD_URL}" target="_blank" rel="noopener">Open TeePublic upload ↗</a>
+       <button class="btn-sec" data-redl="1">Download PNG again</button>`;
+    panel.classList.add('show');
+    panel.querySelectorAll('[data-kit]').forEach(b => b.onclick = () => copyText(fields[b.dataset.kit][1], b));
+    panel.querySelector('[data-redl]').onclick = () => download(finalUrl, idx, file);
+    btn.textContent = '🚀 TeePublic kit ready';
+  } catch(e){
+    console.warn(e);
+    toast('Could not prepare the kit — try again', true);
+    btn.textContent = '🚀 TeePublic kit';
+  }
+  btn.disabled = false;
+}
+
+function renderMetadata(d){
+  const tags = (d.supporting_tags||[]).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+  const kws = (d.seo_keywords||[]).map(k => `<span class="tag">${esc(k)}</span>`).join('');
+  return `<div class="copy-row"><span class="t">${esc(d.title||'')}</span><button class="mini" data-copy="${esc(d.title||'')}">Copy</button></div>
+    <div class="copy-row"><p>${esc(d.description||'')}</p><button class="mini" data-copy="${esc(d.description||'')}">Copy</button></div>
+    <p><strong>Main tag:</strong> ${esc(d.main_tag||'')}</p>
+    <div class="tags">${tags}</div><div class="tags">${kws}</div>
+    <button class="btn-sec" data-all="1">Copy full listing</button>`;
+}
+async function copyText(text, btn){
+  try { await navigator.clipboard.writeText(text); const o = btn.textContent; btn.textContent = 'Copied'; setTimeout(()=>btn.textContent=o, 1500); }
+  catch(e){ toast('Copy failed — select the text manually', true); }
+}
+
+function renderHistory(){
+  if(!history.length) return;
+  $('#historyWrap').hidden = false;
+  const h = $('#history'); h.innerHTML = '';
+  history.slice(0,18).forEach((it,i) => {
+    const im = document.createElement('img');
+    im.src = it.url; im.alt = 'Previous design'; im.title = 'Download';
+    im.onclick = () => download(it.url, i);
+    h.appendChild(im);
+  });
+}
+
+/* ---------- "Add text myself" setting ---------- */
+try { $('#textLater').checked = localStorage.getItem('pf_text_later') === '1'; } catch(e){}
+$('#textLater').onchange = e => { try { localStorage.setItem('pf_text_later', e.target.checked ? '1' : '0'); } catch(_){} };
+
+/* ---------- Text editor: real fonts, always spelled right ---------- */
+const FONTS = [
+  ['Luckiest Guy',400],['Bebas Neue',400],['Anton',400],['Oswald',700],['Bangers',400],
+  ['Permanent Marker',400],['Righteous',400],['Shrikhand',400],['Fredoka',600],
+  ['Pacifico',400],['Lobster',400],['Satisfy',400],['Great Vibes',400],
+  ['Cinzel',800],['Playfair Display',800],['Rye',400],['Creepster',400]
+];
+const EW = 1000, EH = 1100;            // editor space (same ratio as 5000x5500)
+const ED = { slot:null, img:null, cur:'top', s:null };
+const edCv = $('#edCanvas'), edCtx = edCv.getContext('2d');
+FONTS.forEach(([f]) => { const o = document.createElement('option'); o.value = f; o.textContent = f; o.style.fontFamily = `"${f}"`; $('#edFont').appendChild(o); });
+let fontsReady = null;
+function loadFonts(){
+  if(!fontsReady) fontsReady = Promise.all(FONTS.map(([f,w]) => document.fonts.load(`${w} 40px "${f}"`).catch(()=>{})));
+  return fontsReady;
+}
+function fontWeight(name){ const f = FONTS.find(x => x[0] === name); return f ? f[1] : 400; }
+
+function defaultState(slot){
+  const dark = slot.dataset.dark === '1';
+  const words = (slot.dataset.text || '').trim().split(/\s+/).filter(Boolean);
+  let top = words.join(' '), bottom = '';
+  if(words.length > 2){ const k = Math.ceil(words.length / 2); top = words.slice(0, k).join(' '); bottom = words.slice(k).join(' '); }
+  const uni = slot.dataset.universal === '1';
+  return {
+    top:    { text: top,    font:'Luckiest Guy', size:120, arc:35, y:140, x:0, color: uni ? '#16181D' : (dark ? '#FFFFFF' : '#16181D') },
+    bottom: { text: bottom, font:'Pacifico',     size:110, arc:0,  y:975, x:0, color: uni ? '#E4572E' : (dark ? '#FFD23F' : '#E4572E') },
+    stroke: uni ? '#FFFFFF' : (dark ? '#000000' : '#FFFFFF'), sw: uni ? 8 : 0, imgS: 70, imgY: 0
+  };
+}
+
+function drawLine(ctx, L, sw, stroke){
+  const text = (L.text || '').trim();
+  if(!text) return;
+  const X = EW/2 + (L.x || 0);   // horizontal position (left / right)
+  ctx.font = `${fontWeight(L.font)} ${L.size}px "${L.font}"`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+  const paint = (t, x, y) => {
+    if(sw > 0){ ctx.lineWidth = sw * 2; ctx.strokeStyle = stroke; ctx.strokeText(t, x, y); }
+    ctx.fillStyle = L.color; ctx.fillText(t, x, y);
+  };
+  if(!L.arc){ paint(text, X, L.y); return; }
+  const R = 40000 / Math.abs(L.arc), up = L.arc > 0;
+  const chars = [...text], widths = chars.map(c => ctx.measureText(c).width);
+  const total = widths.reduce((a,b) => a+b, 0);
+  const cx = X, cy = up ? L.y + R : L.y - R;
+  let acc = 0;
+  chars.forEach((c, i) => {
+    const a = (acc + widths[i]/2 - total/2) / R;
+    acc += widths[i];
+    ctx.save();
+    if(up){ ctx.translate(cx + R*Math.sin(a), cy - R*Math.cos(a)); ctx.rotate(a); }
+    else  { ctx.translate(cx + R*Math.sin(a), cy + R*Math.cos(a)); ctx.rotate(-a); }
+    paint(c, 0, 0);
+    ctx.restore();
+  });
+}
+
+// k = scale, tx/ty = offset (used by the export to fill the whole 5000x5500 canvas)
+function renderText(ctx, k, tx = 0, ty = 0){
+  const S = ED.s, img = ED.img;
+  ctx.setTransform(k, 0, 0, k, tx, ty);
+  ctx.clearRect(-tx / k, -ty / k, ctx.canvas.width / k, ctx.canvas.height / k);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const side = EW * S.imgS / 100;
+  const r = Math.min(side / img.naturalWidth, side / img.naturalHeight);
+  const w = img.naturalWidth * r, h = img.naturalHeight * r;
+  ctx.drawImage(img, (EW - w)/2, (EH - h)/2 + S.imgY, w, h);
+  drawLine(ctx, S.top, S.sw, S.stroke);
+  drawLine(ctx, S.bottom, S.sw, S.stroke);
+}
+
+// finds the real content box (picture + text) in editor space, ignoring empty margins
+function fitBox(){
+  const W = 500, H = 550;
+  const t = document.createElement('canvas'); t.width = W; t.height = H;
+  const x = t.getContext('2d', { willReadFrequently:true });
+  renderText(x, W / EW);
+  const d = x.getImageData(0, 0, W, H).data;
+  let minX = W, minY = H, maxX = -1, maxY = -1;
+  for(let y = 0; y < H; y++){
+    for(let i = 0; i < W; i++){
+      if(d[(y*W + i)*4 + 3] > 10){
+        if(i < minX) minX = i; if(i > maxX) maxX = i;
+        if(y < minY) minY = y; if(y > maxY) maxY = y;
+      }
+    }
+  }
+  if(maxX < 0) return null;
+  const s = EW / W;   // back to editor space
+  return { x:minX*s, y:minY*s, w:(maxX-minX+1)*s, h:(maxY-minY+1)*s };
+}
+
+let edRaf = 0;
+function edDraw(){ cancelAnimationFrame(edRaf); edRaf = requestAnimationFrame(() => renderText(edCtx, edCv.width / EW)); }
+
+function edFill(){
+  const L = ED.s[ED.cur];
+  $('#edText').value = L.text; $('#edFont').value = L.font; $('#edColor').value = L.color;
+  $('#edSize').value = L.size; $('#edArc').value = L.arc; $('#edY').value = L.y;
+  $('#edX').value = L.x || 0;
+  $('#edStroke').value = ED.s.stroke; $('#edSW').value = ED.s.sw;
+  $('#edHex').value = L.color.toUpperCase(); $('#edStrokeHex').value = ED.s.stroke.toUpperCase();
+  $('#edImgS').value = ED.s.imgS; $('#edImgY').value = ED.s.imgY;
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.line === ED.cur));
+}
+const lineBind = { edText:'text', edFont:'font', edColor:'color', edSize:'size', edArc:'arc', edY:'y', edX:'x' };
+Object.entries(lineBind).forEach(([id, key]) => {
+  $('#' + id).addEventListener('input', e => {
+    const v = e.target.value;
+    ED.s[ED.cur][key] = (key === 'text' || key === 'font' || key === 'color') ? v : +v;
+    if(key === 'font') document.fonts.load(`${fontWeight(v)} 40px "${v}"`).then(edDraw); else edDraw();
+  });
+});
+[['edStroke','stroke',false],['edSW','sw',true],['edImgS','imgS',true],['edImgY','imgY',true]].forEach(([id, key, num]) => {
+  $('#' + id).addEventListener('input', e => { ED.s[key] = num ? +e.target.value : e.target.value; edDraw(); });
+});
+/* color codes + quick swatches */
+const SWATCHES = ['#FFFFFF','#F4E9D0','#FFD23F','#FF8C42','#E63946','#FF4FA3','#B388FF','#4CC9F0','#2EC4B6','#7BC950','#8B5A2B','#16181D'];
+function normHex(v){
+  v = (v || '').trim(); if(!v.startsWith('#')) v = '#' + v;
+  if(/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join('');
+  return /^#[0-9a-f]{6}$/i.test(v) ? v.toUpperCase() : null;
+}
+function setLineColor(v){ ED.s[ED.cur].color = v; $('#edColor').value = v; $('#edHex').value = v; edDraw(); }
+function setStrokeColor(v){
+  ED.s.stroke = v; $('#edStroke').value = v; $('#edStrokeHex').value = v;
+  if(!ED.s.sw){ ED.s.sw = 6; $('#edSW').value = 6; }   // picking an outline color turns the outline on
+  edDraw();
+}
+[['swLine', setLineColor], ['swStroke', setStrokeColor]].forEach(([id, fn]) => {
+  SWATCHES.forEach(c => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw';
+    b.style.background = c; b.title = c; b.setAttribute('aria-label', c);
+    b.onclick = () => fn(c);
+    $('#' + id).appendChild(b);
+  });
+});
+$('#edHex').addEventListener('input', e => { const v = normHex(e.target.value); if(v){ ED.s[ED.cur].color = v; $('#edColor').value = v; edDraw(); } });
+$('#edColor').addEventListener('input', e => { $('#edHex').value = e.target.value.toUpperCase(); });
+$('#edStrokeHex').addEventListener('input', e => { const v = normHex(e.target.value); if(v){ ED.s.stroke = v; $('#edStroke').value = v; edDraw(); } });
+$('#edStroke').addEventListener('input', e => { $('#edStrokeHex').value = e.target.value.toUpperCase(); });
+
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { ED.cur = b.dataset.line; edFill(); });
+
+async function openEditor(slot){
+  try {
+    ED.slot = slot; ED.cur = 'top';
+    ED.img = await loadImageEl(slot._base);
+    ED.s = slot._ed ? JSON.parse(JSON.stringify(slot._ed)) : defaultState(slot);
+    edCv.classList.toggle('dark', slot.dataset.dark === '1');
+    edFill();
+    $('#ed').hidden = false; document.body.style.overflow = 'hidden';
+    renderText(edCtx, edCv.width / EW);
+    await loadFonts(); edDraw();
+  } catch(e){ console.warn(e); toast('Could not open the text editor', true); }
+}
+function closeEditor(){ $('#ed').hidden = true; document.body.style.overflow = ''; }
+$('#edClose').onclick = closeEditor;
+$('#ed').addEventListener('click', e => { if(e.target.id === 'ed') closeEditor(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#ed').hidden) closeEditor(); });
+
+async function applyText(andDownload){
+  const slot = ED.slot, btn = $('#edApply');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Rendering 5000×5500…';
+  try {
+    await loadFonts();
+    const c = document.createElement('canvas'); c.width = PRINT_W; c.height = PRINT_H;
+
+    // scale the content up so it fills the 5000x5500 canvas (no empty margins)
+    const bb = fitBox();
+    let k = PRINT_W / EW, tx = 0, ty = 0;
+    if(bb){
+      k  = Math.min(PRINT_W / bb.w, PRINT_H / bb.h);
+      tx = (PRINT_W - bb.w * k) / 2 - bb.x * k;
+      ty = (PRINT_H - bb.h * k) / 2 - bb.y * k;
+    }
+    renderText(c.getContext('2d'), k, tx, ty);
+
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    if(!blob) throw new Error('export failed');
+    const url = URL.createObjectURL(blob);
+    slot._url = url;
+    slot._ed = JSON.parse(JSON.stringify(ED.s));
+    const newText = [ED.s.top.text, ED.s.bottom.text].map(t => t.trim()).filter(Boolean).join(' ');
+    if(newText !== slot.dataset.text){ slot.dataset.text = newText; slot._meta = null; }
+    slot.querySelector('.img-box').innerHTML = `<img src="${url}" alt="Design with text">`;
+    // these tools work from the picture without text, so hide them once text is added
+    slot.querySelectorAll('.svgBtn, .upBtn').forEach(b => b.hidden = true);
+    const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
+    slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
+    slot.querySelector('.txtBtn').textContent = '✏️ Edit text';
+    history.unshift({ url, prompt:'text' }); renderHistory();
+    closeEditor();
+    if(andDownload) download(url, slot._idx || 0);
+    toast('Text added — TeePublic kit now uses this version');
+  } catch(e){
+    console.warn(e); toast('Could not render — try again', true);
+  }
+  btn.disabled = false; btn.textContent = 'Apply to design';
+}
+$('#edApply').onclick = () => applyText(false);
+$('#edApplyDl').onclick = () => applyText(true);
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let tt;
+function toast(msg, err){
+  clearTimeout(tt); document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t = document.createElement('div'); t.className = 'toast' + (err?' err':''); t.textContent = msg;
+  document.body.appendChild(t); tt = setTimeout(()=>t.remove(), 3500);
+}
+</script>
+<script>
+/* ---------- popular POD niche library (for the concept generator) ---------- */
+const NICHE_LIBRARY = {
+  'Healthcare': ['ER nurses','ICU nurses','L&D nurses','NICU nurses','pediatric nurses','travel nurses','night shift nurses','nursing students','CNAs','paramedics and EMTs','respiratory therapists','pharmacists','pharmacy techs','dental hygienists','dental assistants','radiology techs','phlebotomists','physical therapists','occupational therapists','speech therapists','medical assistants','surgeons','anesthesiologists','veterinarians','vet techs'],
+  'Education': ['kindergarten teachers','elementary teachers','math teachers','science teachers','English teachers','history teachers','art teachers','music teachers','PE teachers','special education teachers','school counselors','school librarians','principals','teacher aides','school bus drivers','cafeteria workers','homeschool moms','substitute teachers'],
+  'Jobs & trades': ['electricians','plumbers','welders','HVAC techs','mechanics','diesel mechanics','carpenters','truck drivers','linemen','construction workers','firefighters','911 dispatchers','accountants','lawyers','paralegals','engineers','software developers','IT support','data analysts','real estate agents','hairstylists','barbers','nail techs','bartenders','baristas','chefs','waitresses','farmers','pilots','flight attendants','social workers','therapists','librarians','military veterans','retail workers','warehouse workers','delivery drivers','customer service reps'],
+  'Family': ['dog moms','dog dads','cat moms','cat dads','boy moms','girl dads','new moms','new dads','grandmas','grandpas','aunties','uncles','twin moms','dance moms','soccer moms','baseball moms','football moms','hockey moms','cheer moms','wrestling moms','stepdads','foster parents','retirees'],
+  'Pets & animals': ['golden retriever owners','pitbull moms','dachshund lovers','German shepherd owners','French bulldog owners','corgi lovers','husky owners','chihuahua owners','labrador owners','border collie owners','black cat lovers','horse girls','backyard chicken keepers','goat lovers','highland cow lovers','bird watchers','beekeepers','axolotl lovers','reptile keepers','capybara fans','frog lovers','raccoon fans','opossum fans'],
+  'Outdoors': ['bass fishing','fly fishing','ice fishing','deer hunting','duck hunting','camping','hiking','RV campers','kayaking','off-roading','overlanding','gardening','homesteaders','astronomy lovers','surfers','skiers','snowboarders'],
+  'Hobbies & crafts': ['crocheting','knitting','quilting','sewing','scrapbooking','woodworking','pottery','painters','photographers','sourdough bakers','home bakers','BBQ pitmasters','coffee lovers','tea lovers','craft beer lovers','wine moms','plant lovers','houseplant collectors','thrifters','true crime fans','cryptid hunters','puzzle lovers','vinyl record collectors'],
+  'Books & games': ['bookworms','romance readers','fantasy readers','book club members','tabletop RPG players','board gamers','video gamers','retro gamers','chess players','trivia nerds'],
+  'Sports & fitness': ['runners','marathon runners','cyclists','weightlifters','powerlifters','yoga lovers','pickleball players','golfers','tennis players','bowlers','disc golfers','archers','swimmers','volleyball players','softball players','rodeo lovers'],
+  'Music & arts': ['guitar players','drummers','piano players','band kids','choir singers','theater kids','dancers','DJs','tattoo artists'],
+  'Vehicles': ['classic car lovers','car guys','motorcycle riders','truck lovers','tractor lovers','drift racing fans','mechanic dads'],
+  'Personality & humor': ['introverts','overthinkers','night owls','sarcastic people','ADHD humor','anxiety humor','mental health awareness','anti-social humor','nap lovers','taco lovers','pizza lovers','spicy food lovers'],
+  'Faith & lifestyle': ['Christian faith','church moms','cottagecore','dark academia','goth style','witchy vibes','minimalists','van life','tiny house living'],
+  'Life events': ['retirement','40th birthday','50th birthday','60th birthday','bachelorette party','bride squad','groom crew','family reunion','class of 2027','new homeowners','pregnancy announcement','cancer survivors','sobriety milestones']
+};
+(function(){
+  const pick = $('#cPick');
+  Object.entries(NICHE_LIBRARY).forEach(([group, list]) => {
+    const g = document.createElement('optgroup'); g.label = group;
+    list.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; g.appendChild(o); });
+    pick.appendChild(g);
+  });
+  pick.onchange = () => { if(pick.value) $('#cNiche').value = pick.value; };
+})();
+
+/* ---------- concept generator (insider-joke ideas) ---------- */
+$('#cBtn').onclick = async () => {
+  const niche = $('#cNiche').value.trim();
+  if(!niche){ toast('Write a niche first', true); $('#cNiche').focus(); return; }
+  const btn = $('#cBtn'), box = $('#concepts');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Thinking…'; box.innerHTML = '';
+  try {
+    const r = await fetch(`/api/concepts?niche=${encodeURIComponent(niche)}&season=${encodeURIComponent($('#cSeason').value)}`, { cache:'no-store' });
+    const d = await r.json();
+    if(d.error || !d.concepts) throw new Error(d.message || d.error);
+    box.innerHTML = d.concepts.map((c, i) => `
+      <div class="concept">
+        <div class="ct">"${esc(c.text)}"</div>
+        <p><strong>Visual:</strong> ${esc(c.visual)}</p>
+        <p><strong>Buyer:</strong> ${esc(c.buyer)}</p>
+        <p><strong>Why it sells:</strong> ${esc(c.why)}</p>
+        <p><strong>Best style:</strong> ${esc(c.style || '')}</p>
+        <div class="row">
+          <button class="btn-sec" data-use="${i}">Use</button>
+          <button class="btn-sec" data-save="${i}">Save</button>
+        </div>
+      </div>`).join('');
+    box.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+      const c = d.concepts[b.dataset.use];
+      $('#idea').value = c.visual; $('#exactText').value = c.text;
+      const opt = [...$('#style').options].find(o => o.textContent === c.style);
+      if(opt) $('#style').value = opt.value;
+      $('#idea').scrollIntoView({ behavior:'smooth', block:'center' });
+      toast(`Added with ${c.style || 'current'} style — tap Generate`);
+    });
+    box.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
+      const c = d.concepts[b.dataset.save];
+      const all = loadCustom(), key = 'My own ideas';
+      const list = all[key] || [];
+      if(!list.some(x => x[0] === c.visual && x[1] === c.text)) list.unshift([c.visual, c.text]);
+      all[key] = list; saveCustom(all);
+      if(nicheSel.value === 'mine') fillIdeas();
+      b.textContent = 'Saved ✓'; b.disabled = true;
+    });
+  } catch(e){
+    console.warn(e);
+    toast('Could not generate concepts — try again', true);
+  }
+  btn.disabled = false; btn.textContent = 'Generate 10 concepts';
+};
+</script>
+</body>
+</html>
