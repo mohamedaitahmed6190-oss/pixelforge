@@ -126,7 +126,6 @@
     <small>Private studio</small>
   </div>
 </header>
-
 <main class="wrap">
   <div class="intro">
     <h1>Design studio</h1>
@@ -302,7 +301,6 @@
 </div>
 
 <footer><a href="/api/generate?prompt=apple" target="_blank">Test API</a></footer>
-
 <script>
 const $ = s => document.querySelector(s);
 
@@ -505,8 +503,7 @@ const NICHES = [
     ['v8 engine',''],
     ['tow truck',''] ]}
 ];
-
-/* ---------- niche & idea selects (+ your own saved ideas) ---------- */
+  /* ---------- niche & idea selects (+ your own saved ideas) ---------- */
 const CUSTOM_KEY = 'pf_custom_ideas';
 function loadCustom(){ try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '{}'); } catch(e){ return {}; } }
 function saveCustom(o){ try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(o)); } catch(e){} }
@@ -736,9 +733,8 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   history.unshift({ url: finalUrl, prompt });
   renderHistory();
   return { ok:true };
-}
-
-/* ---------- print export 5000x5500 ---------- */
+  }
+  /* ---------- print export 5000x5500 ---------- */
 const PRINT_W = 5000, PRINT_H = 5500;
 function loadImageEl(url){
   return new Promise((res, rej) => { const i = new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=url; });
@@ -959,9 +955,8 @@ function renderHistory(){
     im.onclick = () => download(it.url, i);
     h.appendChild(im);
   });
-}
-
-/* ---------- "Add text myself" setting ---------- */
+         }
+  /* ---------- "Add text myself" setting ---------- */
 try { $('#textLater').checked = localStorage.getItem('pf_text_later') === '1'; } catch(e){}
 $('#textLater').onchange = e => { try { localStorage.setItem('pf_text_later', e.target.checked ? '1' : '0'); } catch(_){} };
 
@@ -1028,3 +1023,229 @@ function renderText(ctx, k, tx = 0, ty = 0){
   const S = ED.s, img = ED.img;
   ctx.setTransform(k, 0, 0, k, tx, ty);
   ctx.clearRect(-tx / k, -ty / k, ctx.canvas.width / k, ctx.canvas.height / k);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const side = EW * S.imgS / 100;
+  const r = Math.min(side / img.naturalWidth, side / img.naturalHeight);
+  const w = img.naturalWidth * r, h = img.naturalHeight * r;
+  ctx.drawImage(img, (EW - w)/2, (EH - h)/2 + S.imgY, w, h);
+  drawLine(ctx, S.top, S.sw, S.stroke);
+  drawLine(ctx, S.bottom, S.sw, S.stroke);
+}
+
+// finds the real content box (picture + text) in editor space, ignoring empty margins
+function fitBox(){
+  const W = 500, H = 550;
+  const t = document.createElement('canvas'); t.width = W; t.height = H;
+  const x = t.getContext('2d', { willReadFrequently:true });
+  renderText(x, W / EW);
+  const d = x.getImageData(0, 0, W, H).data;
+  let minX = W, minY = H, maxX = -1, maxY = -1;
+  for(let y = 0; y < H; y++){
+    for(let i = 0; i < W; i++){
+      if(d[(y*W + i)*4 + 3] > 10){
+        if(i < minX) minX = i; if(i > maxX) maxX = i;
+        if(y < minY) minY = y; if(y > maxY) maxY = y;
+      }
+    }
+  }
+  if(maxX < 0) return null;
+  const s = EW / W;   // back to editor space
+  return { x:minX*s, y:minY*s, w:(maxX-minX+1)*s, h:(maxY-minY+1)*s };
+}
+
+let edRaf = 0;
+function edDraw(){ cancelAnimationFrame(edRaf); edRaf = requestAnimationFrame(() => renderText(edCtx, edCv.width / EW)); }
+
+function edFill(){
+  const L = ED.s[ED.cur];
+  $('#edText').value = L.text; $('#edFont').value = L.font; $('#edColor').value = L.color;
+  $('#edSize').value = L.size; $('#edArc').value = L.arc; $('#edY').value = L.y;
+  $('#edX').value = L.x || 0;
+  $('#edStroke').value = ED.s.stroke; $('#edSW').value = ED.s.sw;
+  $('#edHex').value = L.color.toUpperCase(); $('#edStrokeHex').value = ED.s.stroke.toUpperCase();
+  $('#edImgS').value = ED.s.imgS; $('#edImgY').value = ED.s.imgY;
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.line === ED.cur));
+}
+const lineBind = { edText:'text', edFont:'font', edColor:'color', edSize:'size', edArc:'arc', edY:'y', edX:'x' };
+Object.entries(lineBind).forEach(([id, key]) => {
+  $('#' + id).addEventListener('input', e => {
+    const v = e.target.value;
+    ED.s[ED.cur][key] = (key === 'text' || key === 'font' || key === 'color') ? v : +v;
+    if(key === 'font') document.fonts.load(`${fontWeight(v)} 40px "${v}"`).then(edDraw); else edDraw();
+  });
+});
+[['edStroke','stroke',false],['edSW','sw',true],['edImgS','imgS',true],['edImgY','imgY',true]].forEach(([id, key, num]) => {
+  $('#' + id).addEventListener('input', e => { ED.s[key] = num ? +e.target.value : e.target.value; edDraw(); });
+});
+/* color codes + quick swatches */
+const SWATCHES = ['#FFFFFF','#F4E9D0','#FFD23F','#FF8C42','#E63946','#FF4FA3','#B388FF','#4CC9F0','#2EC4B6','#7BC950','#8B5A2B','#16181D'];
+function normHex(v){
+  v = (v || '').trim(); if(!v.startsWith('#')) v = '#' + v;
+  if(/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join('');
+  return /^#[0-9a-f]{6}$/i.test(v) ? v.toUpperCase() : null;
+}
+function setLineColor(v){ ED.s[ED.cur].color = v; $('#edColor').value = v; $('#edHex').value = v; edDraw(); }
+function setStrokeColor(v){
+  ED.s.stroke = v; $('#edStroke').value = v; $('#edStrokeHex').value = v;
+  if(!ED.s.sw){ ED.s.sw = 6; $('#edSW').value = 6; }   // picking an outline color turns the outline on
+  edDraw();
+}
+[['swLine', setLineColor], ['swStroke', setStrokeColor]].forEach(([id, fn]) => {
+  SWATCHES.forEach(c => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw';
+    b.style.background = c; b.title = c; b.setAttribute('aria-label', c);
+    b.onclick = () => fn(c);
+    $('#' + id).appendChild(b);
+  });
+});
+$('#edHex').addEventListener('input', e => { const v = normHex(e.target.value); if(v){ ED.s[ED.cur].color = v; $('#edColor').value = v; edDraw(); } });
+$('#edColor').addEventListener('input', e => { $('#edHex').value = e.target.value.toUpperCase(); });
+$('#edStrokeHex').addEventListener('input', e => { const v = normHex(e.target.value); if(v){ ED.s.stroke = v; $('#edStroke').value = v; edDraw(); } });
+$('#edStroke').addEventListener('input', e => { $('#edStrokeHex').value = e.target.value.toUpperCase(); });
+
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { ED.cur = b.dataset.line; edFill(); });
+
+async function openEditor(slot){
+  try {
+    ED.slot = slot; ED.cur = 'top';
+    ED.img = await loadImageEl(slot._base);
+    ED.s = slot._ed ? JSON.parse(JSON.stringify(slot._ed)) : defaultState(slot);
+    edCv.classList.toggle('dark', slot.dataset.dark === '1');
+    edFill();
+    $('#ed').hidden = false; document.body.style.overflow = 'hidden';
+    renderText(edCtx, edCv.width / EW);
+    await loadFonts(); edDraw();
+  } catch(e){ console.warn(e); toast('Could not open the text editor', true); }
+}
+function closeEditor(){ $('#ed').hidden = true; document.body.style.overflow = ''; }
+$('#edClose').onclick = closeEditor;
+$('#ed').addEventListener('click', e => { if(e.target.id === 'ed') closeEditor(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#ed').hidden) closeEditor(); });
+
+async function applyText(andDownload){
+  const slot = ED.slot, btn = $('#edApply');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Rendering 5000×5500…';
+  try {
+    await loadFonts();
+    const c = document.createElement('canvas'); c.width = PRINT_W; c.height = PRINT_H;
+
+    // scale the content up so it fills the 5000x5500 canvas (no empty margins)
+    const bb = fitBox();
+    let k = PRINT_W / EW, tx = 0, ty = 0;
+    if(bb){
+      k  = Math.min(PRINT_W / bb.w, PRINT_H / bb.h);
+      tx = (PRINT_W - bb.w * k) / 2 - bb.x * k;
+      ty = (PRINT_H - bb.h * k) / 2 - bb.y * k;
+    }
+    renderText(c.getContext('2d'), k, tx, ty);
+
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    if(!blob) throw new Error('export failed');
+    const url = URL.createObjectURL(blob);
+    slot._url = url;
+    slot._ed = JSON.parse(JSON.stringify(ED.s));
+    const newText = [ED.s.top.text, ED.s.bottom.text].map(t => t.trim()).filter(Boolean).join(' ');
+    if(newText !== slot.dataset.text){ slot.dataset.text = newText; slot._meta = null; }
+    slot.querySelector('.img-box').innerHTML = `<img src="${url}" alt="Design with text">`;
+    // these tools work from the picture without text, so hide them once text is added
+    slot.querySelectorAll('.svgBtn, .upBtn').forEach(b => b.hidden = true);
+    const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
+    slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
+    slot.querySelector('.txtBtn').textContent = '✏️ Edit text';
+    history.unshift({ url, prompt:'text' }); renderHistory();
+    closeEditor();
+    if(andDownload) download(url, slot._idx || 0);
+    toast('Text added — TeePublic kit now uses this version');
+  } catch(e){
+    console.warn(e); toast('Could not render — try again', true);
+  }
+  btn.disabled = false; btn.textContent = 'Apply to design';
+}
+$('#edApply').onclick = () => applyText(false);
+$('#edApplyDl').onclick = () => applyText(true);
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let tt;
+function toast(msg, err){
+  clearTimeout(tt); document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t = document.createElement('div'); t.className = 'toast' + (err?' err':''); t.textContent = msg;
+  document.body.appendChild(t); tt = setTimeout(()=>t.remove(), 3500);
+}
+</script>
+<script>
+/* ---------- popular POD niche library (for the concept generator) ---------- */
+const NICHE_LIBRARY = {
+  'Healthcare': ['ER nurses','ICU nurses','L&D nurses','NICU nurses','pediatric nurses','travel nurses','night shift nurses','nursing students','CNAs','paramedics and EMTs','respiratory therapists','pharmacists','pharmacy techs','dental hygienists','dental assistants','radiology techs','phlebotomists','physical therapists','occupational therapists','speech therapists','medical assistants','surgeons','anesthesiologists','veterinarians','vet techs'],
+  'Education': ['kindergarten teachers','elementary teachers','math teachers','science teachers','English teachers','history teachers','art teachers','music teachers','PE teachers','special education teachers','school counselors','school librarians','principals','teacher aides','school bus drivers','cafeteria workers','homeschool moms','substitute teachers'],
+  'Jobs & trades': ['electricians','plumbers','welders','HVAC techs','mechanics','diesel mechanics','carpenters','truck drivers','linemen','construction workers','firefighters','911 dispatchers','accountants','lawyers','paralegals','engineers','software developers','IT support','data analysts','real estate agents','hairstylists','barbers','nail techs','bartenders','baristas','chefs','waitresses','farmers','pilots','flight attendants','social workers','therapists','librarians','military veterans','retail workers','warehouse workers','delivery drivers','customer service reps'],
+  'Family': ['dog moms','dog dads','cat moms','cat dads','boy moms','girl dads','new moms','new dads','grandmas','grandpas','aunties','uncles','twin moms','dance moms','soccer moms','baseball moms','football moms','hockey moms','cheer moms','wrestling moms','stepdads','foster parents','retirees'],
+  'Pets & animals': ['golden retriever owners','pitbull moms','dachshund lovers','German shepherd owners','French bulldog owners','corgi lovers','husky owners','chihuahua owners','labrador owners','border collie owners','black cat lovers','horse girls','backyard chicken keepers','goat lovers','highland cow lovers','bird watchers','beekeepers','axolotl lovers','reptile keepers','capybara fans','frog lovers','raccoon fans','opossum fans'],
+  'Outdoors': ['bass fishing','fly fishing','ice fishing','deer hunting','duck hunting','camping','hiking','RV campers','kayaking','off-roading','overlanding','gardening','homesteaders','astronomy lovers','surfers','skiers','snowboarders'],
+  'Hobbies & crafts': ['crocheting','knitting','quilting','sewing','scrapbooking','woodworking','pottery','painters','photographers','sourdough bakers','home bakers','BBQ pitmasters','coffee lovers','tea lovers','craft beer lovers','wine moms','plant lovers','houseplant collectors','thrifters','true crime fans','cryptid hunters','puzzle lovers','vinyl record collectors'],
+  'Books & games': ['bookworms','romance readers','fantasy readers','book club members','tabletop RPG players','board gamers','video gamers','retro gamers','chess players','trivia nerds'],
+  'Sports & fitness': ['runners','marathon runners','cyclists','weightlifters','powerlifters','yoga lovers','pickleball players','golfers','tennis players','bowlers','disc golfers','archers','swimmers','volleyball players','softball players','rodeo lovers'],
+  'Music & arts': ['guitar players','drummers','piano players','band kids','choir singers','theater kids','dancers','DJs','tattoo artists'],
+  'Vehicles': ['classic car lovers','car guys','motorcycle riders','truck lovers','tractor lovers','drift racing fans','mechanic dads'],
+  'Personality & humor': ['introverts','overthinkers','night owls','sarcastic people','ADHD humor','anxiety humor','mental health awareness','anti-social humor','nap lovers','taco lovers','pizza lovers','spicy food lovers'],
+  'Faith & lifestyle': ['Christian faith','church moms','cottagecore','dark academia','goth style','witchy vibes','minimalists','van life','tiny house living'],
+  'Life events': ['retirement','40th birthday','50th birthday','60th birthday','bachelorette party','bride squad','groom crew','family reunion','class of 2027','new homeowners','pregnancy announcement','cancer survivors','sobriety milestones']
+};
+(function(){
+  const pick = $('#cPick');
+  Object.entries(NICHE_LIBRARY).forEach(([group, list]) => {
+    const g = document.createElement('optgroup'); g.label = group;
+    list.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; g.appendChild(o); });
+    pick.appendChild(g);
+  });
+  pick.onchange = () => { if(pick.value) $('#cNiche').value = pick.value; };
+})();
+
+/* ---------- concept generator (insider-joke ideas) ---------- */
+$('#cBtn').onclick = async () => {
+  const niche = $('#cNiche').value.trim();
+  if(!niche){ toast('Write a niche first', true); $('#cNiche').focus(); return; }
+  const btn = $('#cBtn'), box = $('#concepts');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Thinking…'; box.innerHTML = '';
+  try {
+    const r = await fetch(`/api/concepts?niche=${encodeURIComponent(niche)}&season=${encodeURIComponent($('#cSeason').value)}`, { cache:'no-store' });
+    const d = await r.json();
+    if(d.error || !d.concepts) throw new Error(d.message || d.error);
+    box.innerHTML = d.concepts.map((c, i) => `
+      <div class="concept">
+        <div class="ct">"${esc(c.text)}"</div>
+        <p><strong>Visual:</strong> ${esc(c.visual)}</p>
+        <p><strong>Buyer:</strong> ${esc(c.buyer)}</p>
+        <p><strong>Why it sells:</strong> ${esc(c.why)}</p>
+        <p><strong>Best style:</strong> ${esc(c.style || '')}</p>
+        <div class="row">
+          <button class="btn-sec" data-use="${i}">Use</button>
+          <button class="btn-sec" data-save="${i}">Save</button>
+        </div>
+      </div>`).join('');
+    box.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+      const c = d.concepts[b.dataset.use];
+      $('#idea').value = c.visual; $('#exactText').value = c.text;
+      const opt = [...$('#style').options].find(o => o.textContent === c.style);
+      if(opt) $('#style').value = opt.value;
+      $('#idea').scrollIntoView({ behavior:'smooth', block:'center' });
+      toast(`Added with ${c.style || 'current'} style — tap Generate`);
+    });
+    box.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
+      const c = d.concepts[b.dataset.save];
+      const all = loadCustom(), key = 'My own ideas';
+      const list = all[key] || [];
+      if(!list.some(x => x[0] === c.visual && x[1] === c.text)) list.unshift([c.visual, c.text]);
+      all[key] = list; saveCustom(all);
+      if(nicheSel.value === 'mine') fillIdeas();
+      b.textContent = 'Saved ✓'; b.disabled = true;
+    });
+  } catch(e){
+    console.warn(e);
+    toast('Could not generate concepts — try again', true);
+  }
+  btn.disabled = false; btn.textContent = 'Generate 10 concepts';
+};
+</script>
+</body>
+</html>
