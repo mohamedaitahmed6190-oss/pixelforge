@@ -639,6 +639,72 @@ function addHalo(url){
 function isBgPixel(d, i, dark){
   return dark ? (d[i] < 28 && d[i+1] < 28 && d[i+2] < 28) : (d[i] > 235 && d[i+1] > 235 && d[i+2] > 235);
 }
+// distance (approx. Euclidean, 2-pass chamfer) from every pixel to the nearest pixel where mask = 1
+function distTo(mask, w, h){
+  const n = w*h, d = new Float32Array(n), a = 1, b = 1.4142;
+  for(let i=0;i<n;i++) d[i] = mask[i] ? 0 : 1e9;
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i = y*w + x; let v = d[i];
+      if(x > 0) v = Math.min(v, d[i-1] + a);
+      if(y > 0){
+        v = Math.min(v, d[i-w] + a);
+        if(x > 0) v = Math.min(v, d[i-w-1] + b);
+        if(x < w-1) v = Math.min(v, d[i-w+1] + b);
+      }
+      d[i] = v;
+    }
+  }
+  for(let y=h-1;y>=0;y--){
+    for(let x=w-1;x>=0;x--){
+      const i = y*w + x; let v = d[i];
+      if(x < w-1) v = Math.min(v, d[i+1] + a);
+      if(y < h-1){
+        v = Math.min(v, d[i+w] + a);
+        if(x < w-1) v = Math.min(v, d[i+w+1] + b);
+        if(x > 0) v = Math.min(v, d[i+w-1] + b);
+      }
+      d[i] = v;
+    }
+  }
+  return d;
+}
+// removes the background.
+// sticker = true (Universal sticker style): the artwork is treated like a die-cut sticker. Only the
+// area OUTSIDE the drawing is removed; white parts INSIDE it (ghost sheet, white fur, teeth) stay
+// opaque, even when their outline has a small opening (openings up to ~10% of the image are sealed).
+function removeBg(imgData, dark, sticker){
+  const d = imgData.data, w = imgData.width, h = imgData.height;
+  if(!sticker || dark){ for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; } return; }
+  const R = Math.max(8, Math.round(Math.max(w, h) * 0.05));
+  const P = 2*R + 2, PW = w + 2*P, PH = h + 2*P, n = PW*PH;   // virtual margin so the image border never blocks
+  const fg = new Uint8Array(n);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      if(!isBgPixel(d, (y*w + x)*4, false)) fg[(y+P)*PW + (x+P)] = 1;
+    }
+  }
+  const df = distTo(fg, PW, PH);
+  const out = new Uint8Array(n), stack = new Int32Array(n);
+  let sp = 0;
+  const push = p => { if(!out[p] && df[p] > R){ out[p] = 1; stack[sp++] = p; } };
+  for(let x=0;x<PW;x++){ push(x); push((PH-1)*PW + x); }
+  for(let y=0;y<PH;y++){ push(y*PW); push(y*PW + PW - 1); }
+  while(sp){
+    const p = stack[--sp], x = p % PW;
+    if(x > 0) push(p - 1);
+    if(x < PW - 1) push(p + 1);
+    if(p >= PW) push(p - PW);
+    if(p < n - PW) push(p + PW);
+  }
+  const dO = distTo(out, PW, PH);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const p = (y+P)*PW + (x+P);
+      if(!fg[p] && dO[p] <= R + 1.5) d[(y*w + x)*4 + 3] = 0;
+    }
+  }
+}
 function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
   const idea = $('#idea').value.trim() || 'retro sunset over mountains';
@@ -757,8 +823,8 @@ async function tryPollinations(fullPrompt, seed, box){
   return null;
 }
 
-// near-white pixels → transparent
-function makeTransparent(url, dark){
+// background → transparent
+function makeTransparent(url, dark, sticker){
   return new Promise((resolve) => {
     const img = new Image(); img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -766,8 +832,8 @@ function makeTransparent(url, dark){
         const c = document.createElement('canvas');
         c.width = img.naturalWidth; c.height = img.naturalHeight;
         const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
-        for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
+        const data = ctx.getImageData(0, 0, c.width, c.height);
+        removeBg(data, dark, sticker);
         ctx.putImageData(data, 0, 0);
         c.toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
       } catch(e){ resolve(url); }
@@ -779,7 +845,7 @@ function makeTransparent(url, dark){
 
 async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel){
   const dark = slot.dataset.dark === '1';
-  let finalUrl = await makeTransparent(url, dark);
+  let finalUrl = await makeTransparent(url, dark, slot.dataset.universal === '1');
   if(slot.dataset.universal === '1') finalUrl = await addHalo(finalUrl);
   if(dark) box.classList.add('dark');
   box.innerHTML = `<img src="${finalUrl}" alt="Generated design">`;
@@ -959,8 +1025,8 @@ async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
     const c = document.createElement('canvas');
     c.width = big.naturalWidth; c.height = big.naturalHeight;
     const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
-    const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
-    for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    removeBg(data, dark, halo);
     ctx.putImageData(data, 0, 0);
 
     // crop margins + scale to print size
@@ -1391,4 +1457,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-                                                  </html>
+</html>
