@@ -217,6 +217,8 @@
 
       <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
 
+      <label class="check"><input type="checkbox" id="keepWhite" checked> <span><strong>Keep white parts inside</strong> — ghost sheets, white fur, teeth (turn OFF if a white blob stays inside a wreath)</span></label>
+
       <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
 
       <button id="genBtn" class="gen">Generate 2 designs</button>
@@ -639,6 +641,25 @@ function addHalo(url){
 function isBgPixel(d, i, dark){
   return dark ? (d[i] < 28 && d[i+1] < 28 && d[i+2] < 28) : (d[i] > 235 && d[i+1] > 235 && d[i+2] > 235);
 }
+// removes the background. keepInside = only the background connected to the image border is removed,
+// so white parts INSIDE the subject (ghost sheet, white fur, teeth) stay opaque
+function removeBg(imgData, dark, keepInside){
+  const d = imgData.data, w = imgData.width, h = imgData.height;
+  if(!keepInside){ for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; } return; }
+  const seen = new Uint8Array(w*h), stack = new Int32Array(w*h);
+  let sp = 0;
+  const push = p => { if(!seen[p] && isBgPixel(d, p*4, dark)){ seen[p] = 1; stack[sp++] = p; } };
+  for(let x=0;x<w;x++){ push(x); push((h-1)*w + x); }
+  for(let y=0;y<h;y++){ push(y*w); push(y*w + w - 1); }
+  while(sp){
+    const p = stack[--sp], x = p % w, y = (p - x) / w;
+    d[p*4 + 3] = 0;
+    if(x > 0) push(p - 1);
+    if(x < w - 1) push(p + 1);
+    if(y > 0) push(p - w);
+    if(y < h - 1) push(p + w);
+  }
+}
 function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
   const idea = $('#idea').value.trim() || 'retro sunset over mountains';
@@ -680,6 +701,7 @@ $('#genBtn').onclick = async () => {
     d.dataset.text = $('#exactText').value.trim();
     d.dataset.dark = isDark() ? '1' : '';
     d.dataset.universal = isUniversal() ? '1' : '';
+    d.dataset.keepWhite = $('#keepWhite').checked ? '1' : '';
     d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
     d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
       <button class="btn-sec btn-kit kitBtn" disabled>🚀 TeePublic kit</button>
@@ -758,7 +780,7 @@ async function tryPollinations(fullPrompt, seed, box){
 }
 
 // near-white pixels → transparent
-function makeTransparent(url, dark){
+function makeTransparent(url, dark, keepInside){
   return new Promise((resolve) => {
     const img = new Image(); img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -766,8 +788,8 @@ function makeTransparent(url, dark){
         const c = document.createElement('canvas');
         c.width = img.naturalWidth; c.height = img.naturalHeight;
         const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
-        for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
+        const data = ctx.getImageData(0, 0, c.width, c.height);
+        removeBg(data, dark, keepInside);
         ctx.putImageData(data, 0, 0);
         c.toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
       } catch(e){ resolve(url); }
@@ -779,7 +801,7 @@ function makeTransparent(url, dark){
 
 async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel){
   const dark = slot.dataset.dark === '1';
-  let finalUrl = await makeTransparent(url, dark);
+  let finalUrl = await makeTransparent(url, dark, slot.dataset.keepWhite === '1');
   if(slot.dataset.universal === '1') finalUrl = await addHalo(finalUrl);
   if(dark) box.classList.add('dark');
   box.innerHTML = `<img src="${finalUrl}" alt="Generated design">`;
@@ -796,7 +818,7 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   svgBtn.onclick = () => downloadVectorPNG(finalUrl, idx, svgBtn);
   const upBtn = slot.querySelector('.upBtn');
   upBtn.disabled = false;
-  upBtn.onclick = () => downloadUpscaled(url, idx, upBtn, dark, slot.dataset.universal === '1');
+  upBtn.onclick = () => downloadUpscaled(url, idx, upBtn, dark, slot.dataset.universal === '1', slot.dataset.keepWhite === '1');
   const kitBtn = slot.querySelector('.kitBtn');
   kitBtn.disabled = false;
   kitBtn.onclick = () => teepublicKit(slot, slot._url, idx, ideaVal, productLabel, styleLabel);
@@ -942,7 +964,7 @@ async function getUpscaler(){
   return upscaler;
 }
 // originalUrl = the image BEFORE background removal (AI needs the white background)
-async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
+async function downloadUpscaled(originalUrl, idx, btn, dark, halo, keepInside){
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Loading AI…';
   try {
     const up = await getUpscaler();
@@ -959,8 +981,8 @@ async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
     const c = document.createElement('canvas');
     c.width = big.naturalWidth; c.height = big.naturalHeight;
     const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
-    const data = ctx.getImageData(0, 0, c.width, c.height), d = data.data;
-    for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    removeBg(data, dark, keepInside);
     ctx.putImageData(data, 0, 0);
 
     // crop margins + scale to print size
@@ -1068,6 +1090,8 @@ function renderHistory(){
 
 /* ---------- "Add text myself" setting ---------- */
 try { $('#textLater').checked = localStorage.getItem('pf_text_later') === '1'; } catch(e){}
+try { const kw = localStorage.getItem('pf_keep_white'); if(kw !== null) $('#keepWhite').checked = kw === '1'; } catch(e){}
+$('#keepWhite').onchange = e => { try { localStorage.setItem('pf_keep_white', e.target.checked ? '1' : '0'); } catch(_){} };
 $('#textLater').onchange = e => { try { localStorage.setItem('pf_text_later', e.target.checked ? '1' : '0'); } catch(_){} };
 
 /* ---------- Text editor: real fonts, always spelled right ---------- */
@@ -1391,4 +1415,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-                       </html>
+  </html>
