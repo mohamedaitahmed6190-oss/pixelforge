@@ -639,71 +639,51 @@ function addHalo(url){
 function isBgPixel(d, i, dark){
   return dark ? (d[i] < 28 && d[i+1] < 28 && d[i+2] < 28) : (d[i] > 235 && d[i+1] > 235 && d[i+2] > 235);
 }
-// distance (approx. Euclidean, 2-pass chamfer) from every pixel to the nearest pixel where mask = 1
-function distTo(mask, w, h){
-  const n = w*h, d = new Float32Array(n), a = 1, b = 1.4142;
-  for(let i=0;i<n;i++) d[i] = mask[i] ? 0 : 1e9;
-  for(let y=0;y<h;y++){
-    for(let x=0;x<w;x++){
-      const i = y*w + x; let v = d[i];
-      if(x > 0) v = Math.min(v, d[i-1] + a);
-      if(y > 0){
-        v = Math.min(v, d[i-w] + a);
-        if(x > 0) v = Math.min(v, d[i-w-1] + b);
-        if(x < w-1) v = Math.min(v, d[i-w+1] + b);
-      }
-      d[i] = v;
-    }
+// finds the flat background color the AI drew; null if the background is white / not flat
+function detectBgColor(d, w, h){
+  const rs = [], gs = [], bs = [];
+  const add = p => { const i = p*4; rs.push(d[i]); gs.push(d[i+1]); bs.push(d[i+2]); };
+  for(let x=0;x<w;x+=4){ add(x); add((h-1)*w + x); }
+  for(let y=0;y<h;y+=4){ add(y*w); add(y*w + w - 1); }
+  const med = a => a.slice().sort((p, q) => p - q)[a.length >> 1];
+  const c = [med(rs), med(gs), med(bs)];
+  if(c[0] > 235 && c[1] > 235 && c[2] > 235) return null;   // white background → normal method
+  let ok = 0;
+  for(let k=0;k<rs.length;k++){
+    const dr = rs[k] - c[0], dg = gs[k] - c[1], db = bs[k] - c[2];
+    if(dr*dr + dg*dg + db*db < 48*48) ok++;
   }
-  for(let y=h-1;y>=0;y--){
-    for(let x=w-1;x>=0;x--){
-      const i = y*w + x; let v = d[i];
-      if(x < w-1) v = Math.min(v, d[i+1] + a);
-      if(y < h-1){
-        v = Math.min(v, d[i+w] + a);
-        if(x < w-1) v = Math.min(v, d[i+w+1] + b);
-        if(x > 0) v = Math.min(v, d[i+w-1] + b);
-      }
-      d[i] = v;
-    }
-  }
-  return d;
+  return ok / rs.length > 0.6 ? c : null;
 }
-// removes the background.
-// sticker = true (Universal sticker style): the artwork is treated like a die-cut sticker. Only the
-// area OUTSIDE the drawing is removed; white parts INSIDE it (ghost sheet, white fur, teeth) stay
-// opaque, even when their outline has a small opening (openings up to ~10% of the image are sealed).
-function removeBg(imgData, dark, sticker){
+// color-key removal: every pixel close to the background color goes (outside AND enclosed holes),
+// white parts of the subject are a different color so they stay
+function removeColor(d, w, h, c){
+  const n = w*h, T2 = 48*48, F2 = 150*150, bg = new Uint8Array(n);
+  const dist2 = i => { const dr = d[i] - c[0], dg = d[i+1] - c[1], db = d[i+2] - c[2]; return dr*dr + dg*dg + db*db; };
+  for(let p=0;p<n;p++) if(dist2(p*4) < T2) bg[p] = 1;
+  for(let pass=0; pass<2; pass++){   // eat the 1-2px antialiased fringe next to the removed area
+    const add = [];
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const p = y*w + x;
+        if(bg[p]) continue;
+        const near = (x > 0 && bg[p-1]) || (x < w-1 && bg[p+1]) || (y > 0 && bg[p-w]) || (y < h-1 && bg[p+w]);
+        if(near && dist2(p*4) < F2) add.push(p);
+      }
+    }
+    for(const p of add) bg[p] = 1;
+  }
+  for(let p=0;p<n;p++) if(bg[p]) d[p*4 + 3] = 0;
+}
+// removes the background. chroma = Universal style: the AI draws on a flat color (hot pink), so white
+// parts INSIDE the design (ghost sheet, white fur, teeth) are kept. White background → classic method.
+function removeBg(imgData, dark, chroma){
   const d = imgData.data, w = imgData.width, h = imgData.height;
-  if(!sticker || dark){ for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; } return; }
-  const R = Math.max(8, Math.round(Math.max(w, h) * 0.05));
-  const P = 2*R + 2, PW = w + 2*P, PH = h + 2*P, n = PW*PH;   // virtual margin so the image border never blocks
-  const fg = new Uint8Array(n);
-  for(let y=0;y<h;y++){
-    for(let x=0;x<w;x++){
-      if(!isBgPixel(d, (y*w + x)*4, false)) fg[(y+P)*PW + (x+P)] = 1;
-    }
+  if(chroma && !dark){
+    const c = detectBgColor(d, w, h);
+    if(c){ removeColor(d, w, h, c); return; }
   }
-  const df = distTo(fg, PW, PH);
-  const out = new Uint8Array(n), stack = new Int32Array(n);
-  let sp = 0;
-  const push = p => { if(!out[p] && df[p] > R){ out[p] = 1; stack[sp++] = p; } };
-  for(let x=0;x<PW;x++){ push(x); push((PH-1)*PW + x); }
-  for(let y=0;y<PH;y++){ push(y*PW); push(y*PW + PW - 1); }
-  while(sp){
-    const p = stack[--sp], x = p % PW;
-    if(x > 0) push(p - 1);
-    if(x < PW - 1) push(p + 1);
-    if(p >= PW) push(p - PW);
-    if(p < n - PW) push(p + PW);
-  }
-  const dO = distTo(out, PW, PH);
-  for(let y=0;y<h;y++){
-    for(let x=0;x<w;x++){
-      const p = (y+P)*PW + (x+P);
-      if(!fg[p] && dO[p] <= R + 1.5) d[(y*w + x)*4 + 3] = 0;
-    }
-  }
+  for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
 }
 function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
@@ -717,6 +697,8 @@ function buildPrompt(){
     : `No text, no letters, no words anywhere in the design. `;
   const bg = isDark()
     ? `subject isolated on a solid pure black background with no shadows and no background scenery; the artwork itself uses NO black: all outlines, shading and text are white, cream or bright colors so it prints on a black shirt, `
+    : isUniversal()
+    ? `subject isolated on a solid flat vivid saturated hot pink background (#FF1493, not pastel) filling the whole canvas edge to edge, no gradient, no vignette, no shadows, no background scenery; the subject itself contains NO hot pink and NO magenta; the subject stays centered; white parts of the subject (ghost sheets, white fur, teeth, eyes, snow) stay white with a clear thick dark outline, `
     : `subject isolated on a solid plain white background with no shadows and no background scenery; the subject stays centered; NO pure white and NO near-white anywhere INSIDE the subject: every object that is normally white (ghost sheets, white fur, teeth, snow, clouds, paper, bandages) must be painted in a clearly different soft color such as pastel light blue, lavender or warm beige (about #C3D3EA or #D9C8B0) with visible shading, and fully enclosed by a thick dark outline; the ONLY pure white in the whole image is the plain background, `;
   return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. Style: ${style}. ` +
     `Requirements: high contrast, no watermark, clean crisp edges, ` + bg +
@@ -1457,4 +1439,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-</html>
+      </html>
