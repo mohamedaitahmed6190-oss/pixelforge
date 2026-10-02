@@ -651,7 +651,7 @@ function buildPrompt(){
     : `No text, no letters, no words anywhere in the design. `;
   const bg = isDark()
     ? `subject isolated on a solid pure black background with no shadows and no background scenery; the artwork itself uses NO black: all outlines, shading and text are white, cream or bright colors so it prints on a black shirt, `
-    : `subject isolated on a solid plain white background with no shadows and no background scenery, `;
+    : `subject isolated on a solid plain white background with no shadows and no background scenery; the subject stays centered; any white or very light part INSIDE the subject (ghost sheets, white fur, teeth, eyes, snow, paper, clouds) must be drawn in warm cream or light gray, NEVER pure white, and must be fully enclosed by a thick dark outline so it stays visible; only the background itself is pure white, `;
   return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. Style: ${style}. ` +
     `Requirements: high contrast, no watermark, clean crisp edges, ` + bg +
     `professional illustration quality. Square 1:1 composition.`;
@@ -1391,4 +1391,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-  </html>
+                       </html>
