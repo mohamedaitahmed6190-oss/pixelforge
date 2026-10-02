@@ -217,7 +217,7 @@
 
       <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
 
-      <label class="check"><input type="checkbox" id="keepWhite" checked> <span><strong>Keep white parts inside</strong> — ghost sheets, white fur, teeth (turn OFF if a white blob stays inside a wreath)</span></label>
+      <label class="check"><input type="checkbox" id="keepWhite" checked> <span><strong>Keep white parts inside</strong> — draws on a magenta background so white ghosts / fur / teeth stay (turn OFF to use a white background)</span></label>
 
       <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
 
@@ -641,24 +641,41 @@ function addHalo(url){
 function isBgPixel(d, i, dark){
   return dark ? (d[i] < 28 && d[i+1] < 28 && d[i+2] < 28) : (d[i] > 235 && d[i+1] > 235 && d[i+2] > 235);
 }
-// removes the background. keepInside = only the background connected to the image border is removed,
-// so white parts INSIDE the subject (ghost sheet, white fur, teeth) stay opaque
+// magenta (chroma-key) background: the AI is asked to draw on flat magenta, so white parts INSIDE the
+// subject (ghost sheet, white fur, teeth) can never be mistaken for background
+function isMagentaPx(d, i){
+  const r = d[i], g = d[i+1], b = d[i+2], m = Math.min(r, b);
+  return m > 70 && g < m * 0.45 && Math.abs(r - b) < Math.max(r, b) * 0.35;
+}
+function isMagentaBg(d, w, h){
+  let hit = 0, tot = 0;
+  const probe = p => { tot++; if(isMagentaPx(d, p*4)) hit++; };
+  for(let x=0;x<w;x+=4){ probe(x); probe((h-1)*w + x); }
+  for(let y=0;y<h;y+=4){ probe(y*w); probe(y*w + w - 1); }
+  return tot > 0 && hit / tot > 0.6;
+}
+function removeMagenta(d, w, h){
+  const n = w*h, bg = new Uint8Array(n);
+  for(let p=0;p<n;p++) if(isMagentaPx(d, p*4)) bg[p] = 1;
+  // despill: pixels touching the removed background lose their pink tint
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const p = y*w + x;
+      if(bg[p]) continue;
+      const near = (x > 0 && bg[p-1]) || (x < w-1 && bg[p+1]) || (y > 0 && bg[p-w]) || (y < h-1 && bg[p+w]);
+      if(near){
+        const i = p*4, g = d[i+1], m = Math.min(d[i], d[i+2]);
+        if(m > g){ const cut = (m - g) * 0.7; d[i] = Math.max(0, d[i] - cut); d[i+2] = Math.max(0, d[i+2] - cut); }
+      }
+    }
+  }
+  for(let p=0;p<n;p++) if(bg[p]) d[p*4 + 3] = 0;
+}
+// removes the background: magenta if the AI drew on magenta (keepInside on), otherwise near-white / near-black
 function removeBg(imgData, dark, keepInside){
   const d = imgData.data, w = imgData.width, h = imgData.height;
-  if(!keepInside){ for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; } return; }
-  const seen = new Uint8Array(w*h), stack = new Int32Array(w*h);
-  let sp = 0;
-  const push = p => { if(!seen[p] && isBgPixel(d, p*4, dark)){ seen[p] = 1; stack[sp++] = p; } };
-  for(let x=0;x<w;x++){ push(x); push((h-1)*w + x); }
-  for(let y=0;y<h;y++){ push(y*w); push(y*w + w - 1); }
-  while(sp){
-    const p = stack[--sp], x = p % w, y = (p - x) / w;
-    d[p*4 + 3] = 0;
-    if(x > 0) push(p - 1);
-    if(x < w - 1) push(p + 1);
-    if(y > 0) push(p - w);
-    if(y < h - 1) push(p + w);
-  }
+  if(!dark && keepInside && isMagentaBg(d, w, h)){ removeMagenta(d, w, h); return; }
+  for(let i=0;i<d.length;i+=4){ if(isBgPixel(d, i, dark)) d[i+3]=0; }
 }
 function buildPrompt(){
   const product = $('#product').value, style = $('#style').value;
@@ -670,8 +687,11 @@ function buildPrompt(){
     : text
     ? `The design must contain ONLY this exact text: "${text}". Spell it exactly as written, correct spelling, every letter present, no missing letters, no extra words, no other text. `
     : `No text, no letters, no words anywhere in the design. `;
+  const keep = $('#keepWhite').checked;
   const bg = isDark()
     ? `subject isolated on a solid pure black background with no shadows and no background scenery; the artwork itself uses NO black: all outlines, shading and text are white, cream or bright colors so it prints on a black shirt, `
+    : keep
+    ? `subject isolated on a solid flat pure magenta background (#FF00FF) filling the whole canvas edge to edge, no gradient, no vignette, no shadows, no background scenery; the subject itself contains NO magenta and NO hot pink; the subject stays centered; white parts of the subject (ghost sheets, white fur, teeth, eyes, snow) stay white with a clear dark outline, `
     : `subject isolated on a solid plain white background with no shadows and no background scenery; the subject stays centered; any white or very light part INSIDE the subject (ghost sheets, white fur, teeth, eyes, snow, paper, clouds) must be drawn in warm cream or light gray, NEVER pure white, and must be fully enclosed by a thick dark outline so it stays visible; only the background itself is pure white, `;
   return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. Style: ${style}. ` +
     `Requirements: high contrast, no watermark, clean crisp edges, ` + bg +
@@ -779,7 +799,7 @@ async function tryPollinations(fullPrompt, seed, box){
   return null;
 }
 
-// near-white pixels → transparent
+// background → transparent
 function makeTransparent(url, dark, keepInside){
   return new Promise((resolve) => {
     const img = new Image(); img.crossOrigin = 'anonymous';
@@ -963,7 +983,7 @@ async function getUpscaler(){
   upscaler = new Upscaler({ model: ESRGANSlim2x });
   return upscaler;
 }
-// originalUrl = the image BEFORE background removal (AI needs the white background)
+// originalUrl = the image BEFORE background removal (AI needs the original background)
 async function downloadUpscaled(originalUrl, idx, btn, dark, halo, keepInside){
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Loading AI…';
   try {
@@ -977,7 +997,7 @@ async function downloadUpscaled(originalUrl, idx, btn, dark, halo, keepInside){
     btn.innerHTML = '<span class="spin"></span> Finishing…';
     const big = await loadImageEl(src);
 
-    // remove white background at the upscaled size
+    // remove the background at the upscaled size
     const c = document.createElement('canvas');
     c.width = big.naturalWidth; c.height = big.naturalHeight;
     const ctx = c.getContext('2d'); ctx.drawImage(big, 0, 0);
