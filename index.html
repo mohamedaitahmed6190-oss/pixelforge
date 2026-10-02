@@ -608,6 +608,8 @@ fillIdeas();
 /* ---------- prompt builder ---------- */
 function isDark(){ return $('#style').selectedOptions[0].dataset.dark === '1'; }
 function isUniversal(){ return $('#style').selectedOptions[0].dataset.universal === '1'; }
+// thickness of the white sticker border, as a fraction of the picture width (0.005 = thin, 0.012 = thick)
+const HALO_FRAC = 0.005;
 // adds a white sticker border around the artwork so it also shows on black shirts
 function haloCanvas(c, r){
   const sil = document.createElement('canvas'); sil.width = c.width; sil.height = c.height;
@@ -628,7 +630,7 @@ function addHalo(url){
       try {
         const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
         c.getContext('2d').drawImage(img, 0, 0);
-        haloCanvas(c, Math.round(c.width * 0.012)).toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
+        haloCanvas(c, Math.max(2, Math.round(c.width * HALO_FRAC))).toBlob(b => resolve(b ? URL.createObjectURL(b) : url), 'image/png');
       } catch(e){ resolve(url); }
     };
     img.onerror = () => resolve(url);
@@ -1012,7 +1014,7 @@ async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
     ctx.putImageData(data, 0, 0);
 
     // crop margins + scale to print size
-    const out = fillExport(halo ? haloCanvas(c, Math.round(c.width * 0.012)) : c);
+    const out = fillExport(halo ? haloCanvas(c, Math.max(2, Math.round(c.width * HALO_FRAC))) : c);
 
     await new Promise(res => out.toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return res(); }
@@ -1439,4 +1441,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-      </html>
+  </html>
