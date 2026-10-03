@@ -348,6 +348,7 @@ renderUsage();
 /* ---------- niches: [description, text on design] ---------- */
 const NICHES = [
   { name:'Halloween', hot:true, ideas:[
+    ['cute french bulldog ghost with its tongue out','Spooky Snorts'],
     ['black cat sitting on a carved pumpkin, spooky night','Stay Spooky'],
     ['vintage witch hat with crescent moon and bats','Resting Witch Face'],
     ['skeleton holding a coffee cup','Dead Inside But Caffeinated'],
@@ -542,7 +543,48 @@ const NICHES = [
     ['vintage pickup truck',''],
     ['crossed pistons and wrenches','Grease Monkey'],
     ['v8 engine',''],
-    ['tow truck',''] ]}
+    ['tow truck',''] ]},
+  { name:'Sports fan culture (NFL & MLB)', hot:true, ideas:[
+    ['angry buffalo wearing a football helmet, charging forward, blue and red team colors, mascot parody, no logos','Game Day Beast'],
+    ['brown dog bone crossed with an orange football helmet, underdog fan spirit, no logos','Underdog Forever'],
+    ['pirate skull with crossed swords wearing a football helmet, silver and black colors, no logos','Silver And Black Life'],
+    ['growling bear holding a football, navy and orange colors, mascot parody, no logos','Sunday Beast Mode'],
+    ['bucking bronco horse with football helmet, orange and navy colors, no logos','Mile High Energy'],
+    ['gold rush prospector with a pickaxe and a football, red and gold colors, no logos','Gold Rush Sundays'],
+    ['vintage baseball with crossed bats, black and white pinstripes, retro badge, no logos','Baseball Season'],
+    ['baseball pitcher mid throw silhouette, retro badge, no logos','Heat From The Mound'],
+    ['football stadium at night under bright lights, vintage illustration','Sunday Ritual'],
+    ['vintage football helmet and football laces, distressed retro badge','Die Hard Fan'] ]},
+  { name:'True crime & mystery', hot:true, ideas:[
+    ['detective evidence board with photos, red string and pushpins, grunge classified file aesthetic','Obsessed With True Crime'],
+    ['vintage manila case file folder stamped CLASSIFIED with a magnifying glass, grunge','Case Closed'],
+    ['dark silhouette of a woman with a question mark, vintage police file style','Every Jane Doe Has A Name'],
+    ['dark silhouette figure under a streetlamp in fog, noir style','Stay Curious'],
+    ['true crime podcast microphone with coffee cup and magnifying glass','True Crime And Chill'],
+    ['crime scene tape and magnifying glass, grunge texture','Sorry, Podcast Night'],
+    ['detective trench coat and fedora silhouette, vintage noir',''],
+    ['old typewriter with case files and red string, dark academia',''] ]},
+  { name:'Metal & alternative music', hot:true, ideas:[
+    ['burning skull with flames and horns, rough metal style','Born To Thrash'],
+    ['spiked leather gauntlet fist holding a flaming skull, heavy metal','No Mercy'],
+    ['goat skull with candles and an inverted pentagram, occult woodcut style','Dark Ritual'],
+    ['black metal forest with a crow and a full moon, gritty','Into The Night'],
+    ['skull with bullet belt and lightning, rough metal style','Heavy Metal Forever'],
+    ['demonic horned skull with flames, rough hand-drawn metal lettering style',''] ]},
+  { name:'Southern gothic & Americana', ideas:[
+    ['abandoned wooden church in a foggy field at dusk, sepia tones','Southern Gothic'],
+    ['vintage 1950s pickup truck on an empty dusty highway, sepia tones','Back Road Ghosts'],
+    ['magnolia tree with spanish moss and an old farmhouse, sepia tones',''],
+    ['crow on a barbed wire fence at sunset, sepia tones','Dust And Faith'],
+    ['vintage Americana roadside motel sign at dusk, faded sepia',''],
+    ['old cemetery with weeping willow and iron gate, sepia tones',''] ]},
+  { name:'80s Miami neon & synthwave', hot:true, ideas:[
+    ['neon pink and cyan sunset behind palm trees, 80s Miami style','Neon Nights'],
+    ['80s sports car driving on a neon beach road at sunset with palm trees','Ocean Drive'],
+    ['flamingo wearing sunglasses with neon palm trees',''],
+    ['retro 80s cassette tape with palm trees and sunset','Rewind To 1986'],
+    ['pastel art-deco hotel with neon sign and palm trees','Sunset Strip'],
+    ['sports car silhouette with grid horizon and big sun','Midnight Cruiser'] ]}
 ];
 
 /* ---------- niche & idea selects (+ your own saved ideas) ---------- */
@@ -1441,4 +1483,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-  </html>
+      </html>
