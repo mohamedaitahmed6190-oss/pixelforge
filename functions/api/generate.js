@@ -4,7 +4,7 @@
 // Bindings: AI → Workers AI, KV → "pixelforge-kv"
 
 const POOL_SIZE = 6;          // cached images per prompt
-const DAILY_LIMIT = 200;      // max new generations per day (personal use)
+const DAILY_LIMIT = 150;      // max new generations per day (personal use)
 const TTL = 60 * 60 * 24 * 30;
 
 // ---- Budget cap ----
