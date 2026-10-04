@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s);
 
 /* ---------- daily image counter (kept in this browser, survives refresh) ---------- */
-const DAILY_LIMIT = 120;          // keep equal to the limit in the server file
+const DAILY_LIMIT = 150;          // keep equal to the limit in the server file
 const USAGE_KEY = 'pf_usage';
 function utcDay(){ return new Date().toISOString().slice(0, 10); }
 function loadUsage(){
