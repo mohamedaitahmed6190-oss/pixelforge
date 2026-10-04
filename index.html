@@ -123,10 +123,24 @@
   .cpick input[type=text]{flex:1;font-family:ui-monospace,monospace;text-transform:uppercase}
   .swatches{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
   .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:50}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:70}
   .toast.err{background:#C62828}
   footer{text-align:center;color:var(--muted);font-size:13px;padding:0 20px 30px}
   footer a{color:var(--accent)}
+
+  /* similar image + vector panel */
+  .sim-thumb{display:block;width:100%;max-height:200px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#FAFBFC;margin-top:8px}
+  .sim-thumb[hidden]{display:none}
+  .vp-prev{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;
+    background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
+  .vp-prev.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
+  .vp-prev img{width:100%;height:100%;object-fit:contain;display:block}
+  .vp-busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.65);font-weight:600}
+  .vp-busy[hidden]{display:none}
+  .vp-adv{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px;background:#FAFBFC}
+  .vp-adv summary{font-weight:600;cursor:pointer;margin-bottom:10px}
+  .vp-adv[open] summary{margin-bottom:14px}
+  .vp-sub{font-weight:600;font-size:13px;margin:0 0 6px}
 </style>
 </head>
 <body>
@@ -226,7 +240,7 @@
       <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
 
       <div class="field">
-        <label for="vecLevel">Vector detail <span class="hint">(for ⬇ Vector SVG / HD PNG)</span></label>
+        <label for="vecLevel">Quick vector detail <span class="hint">(for ⬇ Vector SVG / HD PNG buttons)</span></label>
         <select id="vecLevel">
           <option value="detailed">Detailed (24 colors, keeps small details)</option>
           <option value="balanced" selected>Balanced (16 colors, clean lines + detail)</option>
@@ -247,6 +261,23 @@
         .concept .row{display:flex;gap:6px;margin-top:8px}
         .concept .row .btn-sec{margin-top:0}
       </style>
+
+      <div class="divider"></div>
+      <h3 class="tool-title">Similar image</h3>
+      <p class="note" style="margin:4px 0 12px">Pick an image: the AI describes it generically and draws 2 new, improved designs (use the style above). Use only images you have the rights to.</p>
+      <input type="file" id="simFile" accept="image/*" style="display:none">
+      <button id="simPick" class="btn-sec" type="button" style="margin-top:0">📷 Choose image</button>
+      <img id="simThumb" class="sim-thumb" alt="Selected image" hidden>
+      <div class="field" style="margin-top:12px">
+        <label for="simLevel">How different?</label>
+        <select id="simLevel">
+          <option value="close">Very close to the original</option>
+          <option value="mid" selected>Similar, but improved</option>
+          <option value="far">More different</option>
+        </select>
+      </div>
+      <button id="simGo" class="btn-sec" type="button" disabled>✨ Create similar designs</button>
+
       <div class="divider"></div>
       <h3 class="tool-title">Concept generator</h3>
       <p class="note" style="margin:4px 0 12px">10 insider-joke ideas for one niche. Tap "Use" to fill the form.</p>
@@ -328,13 +359,87 @@
   </div>
 </div>
 
+<!-- Vector panel (Image Trace, like Illustrator) -->
+<div id="vp" class="ed" hidden>
+  <div class="ed-box">
+    <div class="ed-head"><h3>Image Trace</h3><button id="vpClose" class="mini" type="button">✕ Close</button></div>
+    <div id="vpPrev" class="vp-prev">
+      <img id="vpImg" alt="Trace preview">
+      <div id="vpBusy" class="vp-busy" hidden><span class="spin"></span>&nbsp;Tracing…</div>
+    </div>
+    <p id="vpStats" class="note" style="margin:8px 0 14px">Paths: 0 · Anchors: 0 · Colors: 0</p>
+
+    <div class="field"><label for="vpPreset">Preset</label><select id="vpPreset"></select></div>
+    <div class="field"><label for="vpView">View</label>
+      <select id="vpView">
+        <option value="result">Tracing Result</option>
+        <option value="resultOutlines">Tracing Result with Outlines</option>
+        <option value="outlines">Outlines</option>
+        <option value="outlinesSource">Outlines with Source Image</option>
+        <option value="source">Source Image</option>
+      </select>
+    </div>
+    <div class="field"><label for="vpMode">Mode</label>
+      <select id="vpMode">
+        <option value="color">Color</option>
+        <option value="gray">Grayscale</option>
+        <option value="bw">Black and White</option>
+      </select>
+    </div>
+    <div class="field" id="rowPalette"><label for="vpPalette">Palette</label>
+      <select id="vpPalette">
+        <option value="limited">Limited</option>
+        <option value="auto">Automatic</option>
+      </select>
+    </div>
+    <div class="field" id="rowColors"><label for="vpColors"><span id="vpColorsL">Colors</span>: <span id="vpColorsV"></span></label>
+      <input id="vpColors" type="range" min="2" max="48" step="1">
+    </div>
+    <div class="field" id="rowThr"><label for="vpThr">Threshold: <span id="vpThrV"></span> <span class="hint">(Less ← → More black)</span></label>
+      <input id="vpThr" type="range" min="0" max="255" step="1">
+    </div>
+
+    <details id="vpAdv" class="vp-adv">
+      <summary>Advanced</summary>
+      <div class="field"><label for="vpPaths">Paths: <span id="vpPathsV"></span> <span class="hint">(Low ← → High)</span></label>
+        <input id="vpPaths" type="range" min="0" max="100" step="1"></div>
+      <div class="field"><label for="vpCorners">Corners: <span id="vpCornersV"></span> <span class="hint">(Less ← → More)</span></label>
+        <input id="vpCorners" type="range" min="0" max="100" step="1"></div>
+      <div class="field"><label for="vpNoise">Noise: <span id="vpNoiseV"></span> <span class="hint">(ignores areas smaller than this)</span></label>
+        <input id="vpNoise" type="range" min="1" max="100" step="1"></div>
+      <p class="vp-sub">Method</p>
+      <div class="seg2" id="vpMethod"><button type="button" data-m="abutting" class="on">Abutting</button><button type="button" data-m="overlap">Overlapping</button></div>
+      <p class="vp-sub">Create</p>
+      <label class="check"><input type="checkbox" id="vpFills"> <span>Fills</span></label>
+      <label class="check"><input type="checkbox" id="vpStrokes"> <span>Strokes</span></label>
+      <div class="field" id="rowStroke"><label for="vpStrokeW">Stroke: <span id="vpStrokeWV"></span></label>
+        <input id="vpStrokeW" type="range" min="0.5" max="20" step="0.5"></div>
+      <p class="vp-sub">Options</p>
+      <label class="check"><input type="checkbox" id="vpSnap"> <span>Snap Curves To Lines</span></label>
+      <label class="check"><input type="checkbox" id="vpIgn"> <span>Ignore White</span></label>
+      <div class="field"><label for="vpRes">Trace resolution <span class="hint">(higher = finer but slower)</span></label>
+        <select id="vpRes">
+          <option value="900">Fast (900 px)</option>
+          <option value="1200">Normal (1200 px)</option>
+          <option value="1800">High (1800 px, slow)</option>
+        </select>
+      </div>
+    </details>
+
+    <label class="check"><input type="checkbox" id="vpAuto"> <span><strong>Preview</strong> — re-trace automatically after each change (slower)</span></label>
+    <button id="vpTrace" class="gen" type="button">Trace</button>
+    <button id="vpSvg" class="btn-sec" type="button">⬇ Download SVG</button>
+    <button id="vpPng" class="btn-sec" type="button">⬇ Download PNG (5000×5500+, transparent)</button>
+  </div>
+</div>
+
 <footer><a href="/api/generate?prompt=apple" target="_blank">Test API</a></footer>
 
 <script>
 const $ = s => document.querySelector(s);
 
 /* ---------- daily image counter (kept in this browser, survives refresh) ---------- */
-const DAILY_LIMIT = 150;          // keep equal to the limit in the server file
+const DAILY_LIMIT = 120;          // keep equal to the limit in the server file
 const USAGE_KEY = 'pf_usage';
 function utcDay(){ return new Date().toISOString().slice(0, 10); }
 function loadUsage(){
@@ -804,6 +909,7 @@ $('#genBtn').onclick = async () => {
       </div>
       <button class="btn-sec btn-text txtBtn" disabled>✏️ Add text</button>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
+      <button class="btn-sec btn-vec panBtn" disabled>🎛 Vector panel</button>
       <button class="btn-sec btn-vec vecBtn" disabled>⬇ Vector SVG</button>
       <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
       <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
@@ -928,6 +1034,9 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   const txtBtn = slot.querySelector('.txtBtn');
   txtBtn.disabled = false;
   txtBtn.onclick = () => openEditor(slot);
+  const panBtn = slot.querySelector('.panBtn');
+  panBtn.disabled = false;
+  panBtn.onclick = () => openVectorPanel(slot);
   const vecBtn = slot.querySelector('.vecBtn');
   vecBtn.disabled = false;
   vecBtn.onclick = () => downloadSVG(slot, idx, vecBtn);
@@ -1066,15 +1175,23 @@ async function download(url, idx, name){
   }
 }
 
-/* ---------- vectorizer: palette → small-region cleanup → edge smoothing → trace ---------- */
-// colors   = palette size          merge   = shades closer than this are merged
-// dark     = colors darker than this fall into the black (keeps outlines continuous)
-// minArea  = isolated patches smaller than this (px) are absorbed (long thin lines are NOT touched)
-// smooth   = edge smoothing radius (px) -> rounded, flowing outlines
-const VEC_LEVELS = {
-  detailed: { size:1600, colors:24, merge:24, dark:55, minArea:60,  smooth:1, pathomit:8,  ltres:1,   qtres:1   },
-  balanced: { size:1400, colors:16, merge:34, dark:60, minArea:130, smooth:2, pathomit:14, ltres:1,   qtres:1   },
-  clean:    { size:1200, colors:10, merge:46, dark:65, minArea:240, smooth:3, pathomit:26, ltres:1.5, qtres:1.5 }
+/* ---------- vectorizer engine (Image Trace) ---------- */
+// default trace settings (the Vector panel and the quick buttons both use these)
+const DEFAULT_T = {
+  mode:'color',      // color | gray | bw
+  palette:'limited', // limited | auto (color mode)
+  colors:16, thr:128,
+  paths:60, corners:60, noise:12,
+  method:'abutting', // abutting | overlap
+  fills:true, strokes:false, strokeW:2,
+  snap:true, ignoreWhite:false,
+  res:1200           // working size of the trace
+};
+// quick buttons (⬇ Vector SVG / HD PNG vectorized)
+const QUICK = {
+  detailed: Object.assign({}, DEFAULT_T, { colors:24, paths:80, corners:50, noise:6,  res:1600 }),
+  balanced: Object.assign({}, DEFAULT_T, { colors:16, paths:65, corners:60, noise:12, res:1400 }),
+  clean:    Object.assign({}, DEFAULT_T, { colors:10, paths:50, corners:70, noise:24, res:1200 })
 };
 
 // running-sum box blur (in place on `a`, `t` is scratch), edges clamped
@@ -1131,7 +1248,7 @@ function removeSmallRegions(cur, w, h, minArea){
 }
 
 // blurs each color's mask and keeps the strongest -> smooth flowing borders, thick lines survive
-async function smoothLabels(cur, w, h, K, r){
+async function smoothLabels(cur, w, h, r){
   const n = w*h, best = new Float32Array(n).fill(-1), lab = new Uint8Array(n);
   const a = new Float32Array(n), t = new Float32Array(n);
   const cnt = new Uint32Array(256);
@@ -1146,137 +1263,205 @@ async function smoothLabels(cur, w, h, K, r){
   cur.set(lab);
 }
 
-// builds the flat palette, snaps pixels, cleans + smooths, writes the flat result back into `id`
-async function cleanQuantize(id, P){
-  const w = id.width, h = id.height, d = id.data, n = w * h;
-  const S = [], step = Math.max(1, Math.floor(n / 20000));
-  for(let p = 0; p < n; p += step){ const i = p*4; if(d[i+3] >= 128) S.push([d[i], d[i+1], d[i+2]]); }
-  if(!S.length) return [{ r:0, g:0, b:0, a:0 }];
-  const d2 = (a, b) => (a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]) + (a[2]-b[2])*(a[2]-b[2]);
-  let seed = 12345;
-  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
-
-  // k-means++ start
-  let C = [S[Math.floor(rnd() * S.length)].slice()];
-  const md = new Float64Array(S.length).fill(Infinity);
-  while(C.length < P.colors){
-    const last = C[C.length - 1]; let sum = 0;
-    for(let i = 0; i < S.length; i++){ const v = d2(S[i], last); if(v < md[i]) md[i] = v; sum += md[i]; }
-    if(sum === 0) break;
-    let r = rnd() * sum, pick = 0;
-    for(let i = 0; i < S.length; i++){ r -= md[i]; if(r <= 0){ pick = i; break; } }
-    C.push(S[pick].slice());
-  }
-  // k-means rounds
-  let cnt = new Array(C.length).fill(0);
-  for(let it = 0; it < 8; it++){
-    const sums = C.map(() => [0, 0, 0, 0]);
-    for(const s of S){
-      let b = 0, bd = Infinity;
-      for(let k = 0; k < C.length; k++){ const v = d2(s, C[k]); if(v < bd){ bd = v; b = k; } }
-      const a = sums[b]; a[0] += s[0]; a[1] += s[1]; a[2] += s[2]; a[3]++;
-    }
-    C = C.map((c, k) => sums[k][3] ? [sums[k][0]/sums[k][3], sums[k][1]/sums[k][3], sums[k][2]/sums[k][3]] : c);
-    cnt = sums.map(s => s[3]);
-  }
-  await sleep(0);
-
-  // merge near-identical shades + absorb tiny noise colors
-  const mergeInto = (keep, drop) => {
-    const t = cnt[keep] + cnt[drop] || 1;
-    C[keep] = [0, 1, 2].map(j => (C[keep][j]*cnt[keep] + C[drop][j]*cnt[drop]) / t);
-    cnt[keep] = t;
-    C.splice(drop, 1); cnt.splice(drop, 1);
+// builds the flat palette (color / gray / black-white), snaps pixels, cleans + smooths,
+// writes the flat result back into `id` and returns the palette for the tracer
+async function cleanQuantize(id, T, size){
+  const w = id.width, h = id.height, d = id.data, n = w * h, kk = size / 1200;
+  const mode = T.mode, p = T.paths / 100;
+  const P = {
+    colors: (mode === 'color' && T.palette === 'auto') ? 28 : T.colors,
+    merge: mode === 'gray' ? Math.max(6, Math.round(200 / T.colors))
+         : (mode === 'color' && T.palette === 'auto') ? 30 : Math.max(18, 70 - T.colors * 2),
+    dark: mode === 'color' ? 60 : 0,
+    minArea: Math.max(3, Math.round(T.noise * 4 * kk * kk)),
+    smooth: Math.max(1, Math.round((p < 0.35 ? 3 : p < 0.7 ? 2 : 1) * kk))
   };
-  const minCnt = S.length * 0.0015, M2 = P.merge * P.merge;
-  let again = true;
-  while(again && C.length > 1){
-    again = false;
-    let bi = -1, bj = -1, bd = Infinity;
-    for(let i = 0; i < C.length; i++) for(let j = i + 1; j < C.length; j++){
-      const v = d2(C[i], C[j]); if(v < bd){ bd = v; bi = i; bj = j; }
-    }
-    if(bd < M2){ mergeInto(cnt[bi] >= cnt[bj] ? bi : bj, cnt[bi] >= cnt[bj] ? bj : bi); again = true; continue; }
-    let t = -1;
-    for(let k = 0; k < C.length; k++) if(cnt[k] < minCnt && (t < 0 || cnt[k] < cnt[t])) t = k;
-    if(t >= 0){
-      let nj = -1, nd = Infinity;
-      for(let k = 0; k < C.length; k++) if(k !== t){ const v = d2(C[t], C[k]); if(v < nd){ nd = v; nj = k; } }
-      mergeInto(nj, t); again = true;
+  const d2 = (a, b) => (a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]) + (a[2]-b[2])*(a[2]-b[2]);
+  const lum = c => 0.3*c[0] + 0.59*c[1] + 0.11*c[2];
+
+  if(mode === 'gray'){
+    for(let i = 0; i < d.length; i += 4){
+      if(d[i+3] >= 128){ const g = Math.round(0.3*d[i] + 0.59*d[i+1] + 0.11*d[i+2]); d[i] = d[i+1] = d[i+2] = g; }
     }
   }
-  // all very dark shades fall into ONE black -> outlines stay continuous
-  const lum = c => 0.3*c[0] + 0.59*c[1] + 0.11*c[2];
-  let di = 0;
-  for(let k = 1; k < C.length; k++) if(lum(C[k]) < lum(C[di])) di = k;
-  const Ci = C.filter((c, k) => k === di || lum(c) >= P.dark).map(c => c.map(v => Math.round(v)));
+
+  let Ci;
+  if(mode === 'bw'){
+    Ci = [[0, 0, 0], [255, 255, 255]];
+  } else {
+    const S = [], step = Math.max(1, Math.floor(n / 20000));
+    for(let q = 0; q < n; q += step){ const i = q*4; if(d[i+3] >= 128) S.push([d[i], d[i+1], d[i+2]]); }
+    if(!S.length) return [{ r:0, g:0, b:0, a:0 }];
+    let seed = 12345;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+
+    // k-means++ start
+    let C = [S[Math.floor(rnd() * S.length)].slice()];
+    const md = new Float64Array(S.length).fill(Infinity);
+    while(C.length < P.colors){
+      const last = C[C.length - 1]; let sum = 0;
+      for(let i = 0; i < S.length; i++){ const v = d2(S[i], last); if(v < md[i]) md[i] = v; sum += md[i]; }
+      if(sum === 0) break;
+      let r = rnd() * sum, pick = 0;
+      for(let i = 0; i < S.length; i++){ r -= md[i]; if(r <= 0){ pick = i; break; } }
+      C.push(S[pick].slice());
+    }
+    // k-means rounds
+    let cnt = new Array(C.length).fill(0);
+    for(let it = 0; it < 8; it++){
+      const sums = C.map(() => [0, 0, 0, 0]);
+      for(const s of S){
+        let b = 0, bd = Infinity;
+        for(let k = 0; k < C.length; k++){ const v = d2(s, C[k]); if(v < bd){ bd = v; b = k; } }
+        const a = sums[b]; a[0] += s[0]; a[1] += s[1]; a[2] += s[2]; a[3]++;
+      }
+      C = C.map((c, k) => sums[k][3] ? [sums[k][0]/sums[k][3], sums[k][1]/sums[k][3], sums[k][2]/sums[k][3]] : c);
+      cnt = sums.map(s => s[3]);
+    }
+    await sleep(0);
+
+    // merge near-identical shades + absorb tiny noise colors
+    const mergeInto = (keep, drop) => {
+      const t = cnt[keep] + cnt[drop] || 1;
+      C[keep] = [0, 1, 2].map(j => (C[keep][j]*cnt[keep] + C[drop][j]*cnt[drop]) / t);
+      cnt[keep] = t;
+      C.splice(drop, 1); cnt.splice(drop, 1);
+    };
+    const minCnt = S.length * 0.0015, M2 = P.merge * P.merge;
+    let again = true;
+    while(again && C.length > 1){
+      again = false;
+      let bi = -1, bj = -1, bd = Infinity;
+      for(let i = 0; i < C.length; i++) for(let j = i + 1; j < C.length; j++){
+        const v = d2(C[i], C[j]); if(v < bd){ bd = v; bi = i; bj = j; }
+      }
+      if(bd < M2){ mergeInto(cnt[bi] >= cnt[bj] ? bi : bj, cnt[bi] >= cnt[bj] ? bj : bi); again = true; continue; }
+      let t = -1;
+      for(let k = 0; k < C.length; k++) if(cnt[k] < minCnt && (t < 0 || cnt[k] < cnt[t])) t = k;
+      if(t >= 0){
+        let nj = -1, nd = Infinity;
+        for(let k = 0; k < C.length; k++) if(k !== t){ const v = d2(C[t], C[k]); if(v < nd){ nd = v; nj = k; } }
+        mergeInto(nj, t); again = true;
+      }
+    }
+    // (color mode) all very dark shades fall into ONE black -> outlines stay continuous
+    let di = 0;
+    for(let k = 1; k < C.length; k++) if(lum(C[k]) < lum(C[di])) di = k;
+    Ci = C.filter((c, k) => k === di || lum(c) >= P.dark).map(c => c.map(v => Math.round(v)));
+  }
   const K = Ci.length;
 
-  // snap every pixel to nearest palette color (255 = transparent)
-  const cur = new Uint8Array(n);
-  for(let p = 0; p < n; p++){
-    const i = p*4;
-    if(d[i+3] < 128){ cur[p] = 255; continue; }
-    let b = 0, bd = Infinity;
-    for(let k = 0; k < K; k++){
-      const c = Ci[k], dr = d[i]-c[0], dg = d[i+1]-c[1], db = d[i+2]-c[2], v = dr*dr + dg*dg + db*db;
-      if(v < bd){ bd = v; b = k; }
+  // "Ignore White": palette colors that are (nearly) white become transparent
+  const ign = new Set();
+  if(T.ignoreWhite) Ci.forEach((c, k) => { if(c[0] >= 235 && c[1] >= 235 && c[2] >= 235) ign.add(k); });
+
+  // snap every pixel to a palette color (255 = transparent)
+  let cur = new Uint8Array(n);
+  for(let q = 0; q < n; q++){
+    const i = q*4;
+    if(d[i+3] < 128){ cur[q] = 255; continue; }
+    let b = 0;
+    if(mode === 'bw'){
+      b = (0.3*d[i] + 0.59*d[i+1] + 0.11*d[i+2]) < T.thr ? 0 : 1;
+    } else {
+      let bd = Infinity;
+      for(let k = 0; k < K; k++){
+        const c = Ci[k], dr = d[i]-c[0], dg = d[i+1]-c[1], db = d[i+2]-c[2], v = dr*dr + dg*dg + db*db;
+        if(v < bd){ bd = v; b = k; }
+      }
     }
-    cur[p] = b;
+    cur[q] = ign.has(b) ? 255 : b;
   }
   await sleep(0);
 
-  removeSmallRegions(cur, w, h, P.minArea);              // 1) kill specks / broken bits
+  removeSmallRegions(cur, w, h, P.minArea);                    // 1) kill specks / broken bits
   await sleep(0);
-  await smoothLabels(cur, w, h, K, P.smooth);            // 2) round + smooth every border
-  removeSmallRegions(cur, w, h, Math.round(P.minArea / 2)); // 3) clean what smoothing left
+  await smoothLabels(cur, w, h, P.smooth);                     // 2) round + smooth every border
+  removeSmallRegions(cur, w, h, Math.round(P.minArea / 2));    // 3) clean what smoothing left
 
   // write the flat result back
-  for(let p = 0; p < n; p++){
-    const i = p*4, l = cur[p];
+  for(let q = 0; q < n; q++){
+    const i = q*4, l = cur[q];
     if(l === 255){ d[i] = d[i+1] = d[i+2] = 0; d[i+3] = 0; }
     else { const c = Ci[l]; d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2]; d[i+3] = 255; }
   }
   return Ci.map(c => ({ r:c[0], g:c[1], b:c[2], a:255 })).concat([{ r:0, g:0, b:0, a:0 }]);
 }
 
-// traces the CURRENT design (with added text if any) → { svg, w, h }
-async function vectorize(slot){
-  if(!window.ImageTracer) throw new Error('Vector tool not loaded — refresh the page');
-  const P = VEC_LEVELS[$('#vecLevel').value] || VEC_LEVELS.balanced;
+// loads the CURRENT design (with added text if any), crops margins, scales to `size`, light blur (kills AI grain)
+async function prepareSource(slot, size){
   const img = await loadImageEl(slot._url);
   const sc = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
   const c0 = document.createElement('canvas');
   c0.width = Math.max(1, Math.round(img.naturalWidth * sc)); c0.height = Math.max(1, Math.round(img.naturalHeight * sc));
   const x0 = c0.getContext('2d', { willReadFrequently:true });
   x0.imageSmoothingQuality = 'high'; x0.drawImage(img, 0, 0, c0.width, c0.height);
-  const bb = alphaBox(c0);                                   // crop transparent margins
-  const k = P.size / Math.max(bb.w, bb.h);
+  const bb = alphaBox(c0);
+  const k = size / Math.max(bb.w, bb.h);
   const w = Math.max(1, Math.round(bb.w * k)), h = Math.max(1, Math.round(bb.h * k));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d', { willReadFrequently:true });
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  try { ctx.filter = 'blur(0.7px)'; } catch(e){}            // removes AI grain before quantizing
+  try { ctx.filter = `blur(${(0.6 * size / 1200).toFixed(2)}px)`; } catch(e){}
   ctx.drawImage(c0, bb.x, bb.y, bb.w, bb.h, 0, 0, w, h);
   try { ctx.filter = 'none'; } catch(e){}
-  const id = ctx.getImageData(0, 0, w, h);
-  await sleep(30);
-  const pal = await cleanQuantize(id, P);                    // flat palette, clean regions, smooth borders
+  return { c, ctx, w, h, url:null };
+}
+function srcUrl(S){ return S.url || (S.url = S.c.toDataURL('image/png')); }
+
+// quantize + trace one image -> { svg, w, h, stats }
+async function traceCore(id, w, h, T, size){
+  const pal = await cleanQuantize(id, T, size);
   await sleep(0);
+  const kk = size / 1200, p = T.paths / 100, c = T.corners / 100;
+  const L = 0.3 * Math.pow(12, 1 - p);                         // fit tolerance: Paths High = tight
+  const snap = T.snap ? 1.3 : 1;
+  const sw = T.strokes ? Math.max(0.5, T.strokeW * kk) : (T.method === 'overlap' ? 3 * kk : 1 * kk);
   let svg = ImageTracer.imagedataToSVG(id, {
     pal, colorsampling: 0, numberofcolors: pal.length, colorquantcycles: 1, mincolorratio: 0,
-    ltres: P.ltres, qtres: P.qtres, pathomit: P.pathomit, rightangleenhance: false, blurradius: 0,
-    strokewidth: 1, roundcoords: 2, viewbox: true, desc: false   // strokewidth 1 hides hairline seams between colors
+    ltres: L * (0.5 + c * 1.5) * snap, qtres: L * (1.6 - c),
+    pathomit: Math.max(1, Math.round(T.noise * 1.1 * kk)),
+    rightangleenhance: c >= 0.8, blurradius: 0,
+    strokewidth: sw, roundcoords: 2, viewbox: true, desc: false
   });
-  svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')    // drop the transparent "color"
+  svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')      // drop the transparent "color"
            .replace('<svg ', `<svg width="${w}" height="${h}" `);
-  return { svg, w, h };
+  if(T.strokes && !T.fills) svg = svg.replace(/fill="rgb\([^)]*\)"/g, 'fill="none"');
+  // stats (like Illustrator: Paths / Anchors / Colors)
+  const paths = (svg.match(/<path/g) || []).length;
+  let anchors = 0, m;
+  const dre = /\sd="([^"]*)"/g;
+  while((m = dre.exec(svg))) anchors += (m[1].match(/[MLQ]/g) || []).length;
+  const cols = new Set((svg.match(/fill="rgb\([^)]*\)"/g) || []));
+  if(T.strokes && !T.fills) (svg.match(/stroke="rgb\([^)]*\)"/g) || []).forEach(s => cols.add(s));
+  return { svg, w, h, stats:{ paths, anchors, colors:cols.size } };
+}
+
+// used by the quick buttons
+async function vectorize(slot){
+  if(!window.ImageTracer) throw new Error('Vector tool not loaded — refresh the page');
+  const T = Object.assign({}, QUICK[$('#vecLevel').value] || QUICK.balanced);
+  const S = await prepareSource(slot, T.res);
+  const id = S.ctx.getImageData(0, 0, S.w, S.h);
+  await sleep(30);
+  return traceCore(id, S.w, S.h, T, T.res);
 }
 function saveBlob(blob, name){
   const u = URL.createObjectURL(blob), a = document.createElement('a');
   a.href = u; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(u), 10000);
+}
+// vector -> razor-sharp canvas at print size
+async function svgToPrintCanvas(svg, w, h){
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
+  const vec = await loadImageEl(svgUrl);
+  const k = printScale(w, h);
+  const out = document.createElement('canvas'); out.width = Math.round(w * k); out.height = Math.round(h * k);
+  const o = out.getContext('2d'); o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+  o.drawImage(vec, 0, 0, out.width, out.height);
+  URL.revokeObjectURL(svgUrl);
+  return out;
 }
 async function downloadSVG(slot, idx, btn){
   const old = btn.textContent;
@@ -1290,19 +1475,12 @@ async function downloadSVG(slot, idx, btn){
   }
   btn.disabled = false; btn.textContent = old;
 }
-// vector → razor-sharp PNG at print size
 async function downloadVectorPNG(slot, idx, btn){
   const old = btn.textContent;
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
   try {
     const { svg, w, h } = await vectorize(slot);
-    const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
-    const vec = await loadImageEl(svgUrl);
-    const k = printScale(w, h);
-    const out = document.createElement('canvas'); out.width = Math.round(w * k); out.height = Math.round(h * k);
-    const o = out.getContext('2d'); o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
-    o.drawImage(vec, 0, 0, out.width, out.height);
-    URL.revokeObjectURL(svgUrl);
+    const out = await svgToPrintCanvas(svg, w, h);
     await new Promise(res => out.toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return res(); }
       saveBlob(b, `pod-design-${Date.now()}-${idx+1}-HD-print.png`);
@@ -1464,7 +1642,7 @@ function renderHistory(){
 /* ---------- settings kept in this browser ---------- */
 try { $('#textLater').checked = localStorage.getItem('pf_text_later') === '1'; } catch(e){}
 $('#textLater').onchange = e => { try { localStorage.setItem('pf_text_later', e.target.checked ? '1' : '0'); } catch(_){} };
-try { const v = localStorage.getItem('pf_vec_level'); if(v && VEC_LEVELS[v]) $('#vecLevel').value = v; } catch(e){}
+try { const v = localStorage.getItem('pf_vec_level'); if(v && QUICK[v]) $('#vecLevel').value = v; } catch(e){}
 $('#vecLevel').onchange = e => { try { localStorage.setItem('pf_vec_level', e.target.value); } catch(_){} };
 
 /* ---------- Text editor: real fonts, always spelled right ---------- */
@@ -1686,107 +1864,4 @@ async function applyText(andDownload){
     slot._ed = JSON.parse(JSON.stringify(ED.s));
     const newText = [ED.s.top.text, ED.s.bottom.text].map(t => t.trim()).filter(Boolean).join(' ');
     if(newText !== slot.dataset.text){ slot.dataset.text = newText; slot._meta = null; }
-    slot.querySelector('.img-box').innerHTML = `<img src="${url}" alt="Design with text">`;
-    // AI upscale works from the picture without text, so hide it once text is added
-    // (Vector SVG / HD PNG vectorized include the text)
-    slot.querySelectorAll('.upBtn').forEach(b => b.hidden = true);
-    const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
-    slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
-    slot.querySelector('.txtBtn').textContent = '✏️ Edit text';
-    history.unshift({ url, prompt:'text' }); renderHistory();
-    closeEditor();
-    if(andDownload) download(url, slot._idx || 0);
-    toast('Text added — TeePublic kit now uses this version');
-  } catch(e){
-    console.warn(e); toast('Could not render — try again', true);
-  }
-  btn.disabled = false; btn.textContent = 'Apply to design';
-}
-$('#edApply').onclick = () => applyText(false);
-$('#edApplyDl').onclick = () => applyText(true);
-
-function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-let tt;
-function toast(msg, err){
-  clearTimeout(tt); document.querySelectorAll('.toast').forEach(t=>t.remove());
-  const t = document.createElement('div'); t.className = 'toast' + (err?' err':''); t.textContent = msg;
-  document.body.appendChild(t); tt = setTimeout(()=>t.remove(), 3500);
-}
-</script>
-<script>
-/* ---------- popular POD niche library (for the concept generator) ---------- */
-const NICHE_LIBRARY = {
-  'Healthcare': ['ER nurses','ICU nurses','L&D nurses','NICU nurses','pediatric nurses','travel nurses','night shift nurses','nursing students','CNAs','paramedics and EMTs','respiratory therapists','pharmacists','pharmacy techs','dental hygienists','dental assistants','radiology techs','phlebotomists','physical therapists','occupational therapists','speech therapists','medical assistants','surgeons','anesthesiologists','veterinarians','vet techs'],
-  'Education': ['kindergarten teachers','elementary teachers','math teachers','science teachers','English teachers','history teachers','art teachers','music teachers','PE teachers','special education teachers','school counselors','school librarians','principals','teacher aides','school bus drivers','cafeteria workers','homeschool moms','substitute teachers'],
-  'Jobs & trades': ['electricians','plumbers','welders','HVAC techs','mechanics','diesel mechanics','carpenters','truck drivers','linemen','construction workers','firefighters','911 dispatchers','accountants','lawyers','paralegals','engineers','software developers','IT support','data analysts','real estate agents','hairstylists','barbers','nail techs','bartenders','baristas','chefs','waitresses','farmers','pilots','flight attendants','social workers','therapists','librarians','military veterans','retail workers','warehouse workers','delivery drivers','customer service reps'],
-  'Family': ['dog moms','dog dads','cat moms','cat dads','boy moms','girl dads','new moms','new dads','grandmas','grandpas','aunties','uncles','twin moms','dance moms','soccer moms','baseball moms','football moms','hockey moms','cheer moms','wrestling moms','stepdads','foster parents','retirees'],
-  'Pets & animals': ['golden retriever owners','pitbull moms','dachshund lovers','German shepherd owners','French bulldog owners','corgi lovers','husky owners','chihuahua owners','labrador owners','border collie owners','black cat lovers','horse girls','backyard chicken keepers','goat lovers','highland cow lovers','bird watchers','beekeepers','axolotl lovers','reptile keepers','capybara fans','frog lovers','raccoon fans','opossum fans'],
-  'Outdoors': ['bass fishing','fly fishing','ice fishing','deer hunting','duck hunting','camping','hiking','RV campers','kayaking','off-roading','overlanding','gardening','homesteaders','astronomy lovers','surfers','skiers','snowboarders'],
-  'Hobbies & crafts': ['crocheting','knitting','quilting','sewing','scrapbooking','woodworking','pottery','painters','photographers','sourdough bakers','home bakers','BBQ pitmasters','coffee lovers','tea lovers','craft beer lovers','wine moms','plant lovers','houseplant collectors','thrifters','true crime fans','cryptid hunters','puzzle lovers','vinyl record collectors'],
-  'Books & games': ['bookworms','romance readers','fantasy readers','book club members','tabletop RPG players','board gamers','video gamers','retro gamers','chess players','trivia nerds'],
-  'Sports & fitness': ['runners','marathon runners','cyclists','weightlifters','powerlifters','yoga lovers','pickleball players','golfers','tennis players','bowlers','disc golfers','archers','swimmers','volleyball players','softball players','rodeo lovers'],
-  'Music & arts': ['guitar players','drummers','piano players','band kids','choir singers','theater kids','dancers','DJs','tattoo artists'],
-  'Vehicles': ['classic car lovers','car guys','motorcycle riders','truck lovers','tractor lovers','drift racing fans','mechanic dads'],
-  'Personality & humor': ['introverts','overthinkers','night owls','sarcastic people','ADHD humor','anxiety humor','mental health awareness','anti-social humor','nap lovers','taco lovers','pizza lovers','spicy food lovers'],
-  'Faith & lifestyle': ['Christian faith','church moms','cottagecore','dark academia','goth style','witchy vibes','minimalists','van life','tiny house living'],
-  'Life events': ['retirement','40th birthday','50th birthday','60th birthday','bachelorette party','bride squad','groom crew','family reunion','class of 2027','new homeowners','pregnancy announcement','cancer survivors','sobriety milestones']
-};
-(function(){
-  const pick = $('#cPick');
-  Object.entries(NICHE_LIBRARY).forEach(([group, list]) => {
-    const g = document.createElement('optgroup'); g.label = group;
-    list.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; g.appendChild(o); });
-    pick.appendChild(g);
-  });
-  pick.onchange = () => { if(pick.value) $('#cNiche').value = pick.value; };
-})();
-
-/* ---------- concept generator (insider-joke ideas) ---------- */
-$('#cBtn').onclick = async () => {
-  const niche = $('#cNiche').value.trim();
-  if(!niche){ toast('Write a niche first', true); $('#cNiche').focus(); return; }
-  const btn = $('#cBtn'), box = $('#concepts');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Thinking…'; box.innerHTML = '';
-  try {
-    const r = await fetch(`/api/concepts?niche=${encodeURIComponent(niche)}&season=${encodeURIComponent($('#cSeason').value)}`, { cache:'no-store' });
-    const d = await r.json();
-    if(d.error || !d.concepts) throw new Error(d.message || d.error);
-    box.innerHTML = d.concepts.map((c, i) => `
-      <div class="concept">
-        <div class="ct">"${esc(c.text)}"</div>
-        <p><strong>Visual:</strong> ${esc(c.visual)}</p>
-        <p><strong>Buyer:</strong> ${esc(c.buyer)}</p>
-        <p><strong>Why it sells:</strong> ${esc(c.why)}</p>
-        <p><strong>Best style:</strong> ${esc(c.style || '')}</p>
-        <div class="row">
-          <button class="btn-sec" data-use="${i}">Use</button>
-          <button class="btn-sec" data-save="${i}">Save</button>
-        </div>
-      </div>`).join('');
-    box.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
-      const c = d.concepts[b.dataset.use];
-      $('#idea').value = c.visual; $('#exactText').value = c.text;
-      const opt = [...$('#style').options].find(o => o.textContent === c.style);
-      if(opt) $('#style').value = opt.value;
-      $('#idea').scrollIntoView({ behavior:'smooth', block:'center' });
-      toast(`Added with ${c.style || 'current'} style — tap Generate`);
-    });
-    box.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
-      const c = d.concepts[b.dataset.save];
-      const all = loadCustom(), key = 'My own ideas';
-      const list = all[key] || [];
-      if(!list.some(x => x[0] === c.visual && x[1] === c.text)) list.unshift([c.visual, c.text]);
-      all[key] = list; saveCustom(all);
-      if(nicheSel.value === 'mine') fillIdeas();
-      b.textContent = 'Saved ✓'; b.disabled = true;
-    });
-  } catch(e){
-    console.warn(e);
-    toast('Could not generate concepts — try again', true);
-  }
-  btn.disabled = false; btn.textContent = 'Generate 10 concepts';
-};
-</script>
-</body>
-</html>
+    slot.querySelector('.img-box').innerHTML = 
