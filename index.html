@@ -228,9 +228,9 @@
       <div class="field">
         <label for="vecLevel">Vector detail <span class="hint">(for ⬇ Vector SVG / HD PNG)</span></label>
         <select id="vecLevel">
-          <option value="detailed">Detailed (48 colors, most faithful)</option>
-          <option value="balanced">Balanced (24 colors)</option>
-          <option value="clean">Clean (12 colors, best for print)</option>
+          <option value="detailed">Detailed (24 colors, keeps small details)</option>
+          <option value="balanced" selected>Balanced (16 colors, clean + detailed)</option>
+          <option value="clean">Clean (10 colors, smoothest, best for print)</option>
         </select>
       </div>
 
@@ -912,7 +912,7 @@ async function applyRaw(slot, rawUrl){
 // after the picture changed (AI edit / undo) the old added text no longer matches
 function resetAfterPictureChange(slot){
   slot._ed = null;
-  slot.querySelectorAll('.svgBtn, .upBtn').forEach(b => b.hidden = false);
+  slot.querySelectorAll('.upBtn').forEach(b => b.hidden = false);
   const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
   slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
   slot.querySelector('.txtBtn').textContent = '✏️ Add text';
@@ -1066,16 +1066,129 @@ async function download(url, idx, name){
   }
 }
 
-/* ---------- vectorizer: real SVG (traced), 3 detail levels ---------- */
+/* ---------- vectorizer: CLEAN palette + majority filter, then trace ---------- */
+// colors = palette size, merge = colors closer than this get merged, radius/passes = speckle cleaner strength
 const VEC_LEVELS = {
-  detailed: { size:2048, colors:48, pathomit:6,  ltres:0.6, qtres:0.6, cycles:4 },
-  balanced: { size:1600, colors:24, pathomit:12, ltres:1,   qtres:1,   cycles:3 },
-  clean:    { size:1200, colors:12, pathomit:24, ltres:1.5, qtres:1.5, cycles:3 }
+  detailed: { size:1600, colors:24, merge:26, radius:1, passes:1, pathomit:10, ltres:0.8, qtres:0.8 },
+  balanced: { size:1400, colors:16, merge:36, radius:1, passes:2, pathomit:16, ltres:1,   qtres:1   },
+  clean:    { size:1200, colors:10, merge:48, radius:2, passes:1, pathomit:30, ltres:1.5, qtres:1.5 }
 };
+
+// 1) builds a small flat palette (k-means), merges near-duplicate shades
+// 2) snaps every pixel to the palette  3) majority filter removes speckles + fringe lines
+// modifies `id` in place and returns the palette for the tracer
+async function cleanQuantize(id, P){
+  const w = id.width, h = id.height, d = id.data, n = w * h;
+  const S = [], step = Math.max(1, Math.floor(n / 20000));
+  for(let p = 0; p < n; p += step){ const i = p*4; if(d[i+3] >= 128) S.push([d[i], d[i+1], d[i+2]]); }
+  if(!S.length) return [{ r:0, g:0, b:0, a:0 }];
+  const d2 = (a, b) => (a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]) + (a[2]-b[2])*(a[2]-b[2]);
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+
+  // k-means++ start
+  let C = [S[Math.floor(rnd() * S.length)].slice()];
+  const md = new Float64Array(S.length).fill(Infinity);
+  while(C.length < P.colors){
+    const last = C[C.length - 1]; let sum = 0;
+    for(let i = 0; i < S.length; i++){ const v = d2(S[i], last); if(v < md[i]) md[i] = v; sum += md[i]; }
+    if(sum === 0) break;
+    let r = rnd() * sum, pick = 0;
+    for(let i = 0; i < S.length; i++){ r -= md[i]; if(r <= 0){ pick = i; break; } }
+    C.push(S[pick].slice());
+  }
+  // k-means rounds
+  let cnt = new Array(C.length).fill(0);
+  for(let it = 0; it < 8; it++){
+    const sums = C.map(() => [0, 0, 0, 0]);
+    for(const s of S){
+      let b = 0, bd = Infinity;
+      for(let k = 0; k < C.length; k++){ const v = d2(s, C[k]); if(v < bd){ bd = v; b = k; } }
+      const a = sums[b]; a[0] += s[0]; a[1] += s[1]; a[2] += s[2]; a[3]++;
+    }
+    C = C.map((c, k) => sums[k][3] ? [sums[k][0]/sums[k][3], sums[k][1]/sums[k][3], sums[k][2]/sums[k][3]] : c);
+    cnt = sums.map(s => s[3]);
+  }
+  await sleep(0);
+
+  // merge near-identical shades + absorb tiny noise colors
+  const mergeInto = (keep, drop) => {
+    const t = cnt[keep] + cnt[drop] || 1;
+    C[keep] = [0, 1, 2].map(j => (C[keep][j]*cnt[keep] + C[drop][j]*cnt[drop]) / t);
+    cnt[keep] = t;
+    C.splice(drop, 1); cnt.splice(drop, 1);
+  };
+  const minCnt = S.length * 0.0015, M2 = P.merge * P.merge;
+  let again = true;
+  while(again && C.length > 1){
+    again = false;
+    let bi = -1, bj = -1, bd = Infinity;
+    for(let i = 0; i < C.length; i++) for(let j = i + 1; j < C.length; j++){
+      const v = d2(C[i], C[j]); if(v < bd){ bd = v; bi = i; bj = j; }
+    }
+    if(bd < M2){ mergeInto(cnt[bi] >= cnt[bj] ? bi : bj, cnt[bi] >= cnt[bj] ? bj : bi); again = true; continue; }
+    let t = -1;
+    for(let k = 0; k < C.length; k++) if(cnt[k] < minCnt && (t < 0 || cnt[k] < cnt[t])) t = k;
+    if(t >= 0){
+      let nj = -1, nd = Infinity;
+      for(let k = 0; k < C.length; k++) if(k !== t){ const v = d2(C[t], C[k]); if(v < nd){ nd = v; nj = k; } }
+      mergeInto(nj, t); again = true;
+    }
+  }
+  const K = C.length;
+  const Ci = C.map(c => c.map(v => Math.round(v)));
+
+  // snap every pixel to nearest palette color (255 = transparent)
+  let cur = new Uint8Array(n);
+  for(let p = 0; p < n; p++){
+    const i = p*4;
+    if(d[i+3] < 128){ cur[p] = 255; continue; }
+    let b = 0, bd = Infinity;
+    for(let k = 0; k < K; k++){
+      const c = Ci[k], dr = d[i]-c[0], dg = d[i+1]-c[1], db = d[i+2]-c[2], v = dr*dr + dg*dg + db*db;
+      if(v < bd){ bd = v; b = k; }
+    }
+    cur[p] = b;
+  }
+  await sleep(0);
+
+  // majority filter: kills speckles, grain and thin in-between lines
+  const hist = new Uint16Array(K), R = P.radius;
+  for(let pass = 0; pass < P.passes; pass++){
+    const out = new Uint8Array(n);
+    for(let y = 0; y < h; y++){
+      const y0 = Math.max(0, y - R), y1 = Math.min(h - 1, y + R);
+      for(let x = 0; x < w; x++){
+        const p = y*w + x, l = cur[p];
+        if(l === 255){ out[p] = 255; continue; }
+        hist.fill(0);
+        const x0 = Math.max(0, x - R), x1 = Math.min(w - 1, x + R);
+        for(let yy = y0; yy <= y1; yy++){
+          const row = yy*w;
+          for(let xx = x0; xx <= x1; xx++){ const v = cur[row + xx]; if(v !== 255) hist[v]++; }
+        }
+        let best = l, bc = hist[l];
+        for(let k = 0; k < K; k++) if(hist[k] > bc){ bc = hist[k]; best = k; }
+        out[p] = best;
+      }
+      if((y & 127) === 0) await sleep(0);
+    }
+    cur = out;
+  }
+
+  // write the flat result back
+  for(let p = 0; p < n; p++){
+    const i = p*4, l = cur[p];
+    if(l === 255){ d[i] = d[i+1] = d[i+2] = 0; d[i+3] = 0; }
+    else { const c = Ci[l]; d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2]; d[i+3] = 255; }
+  }
+  return Ci.map(c => ({ r:c[0], g:c[1], b:c[2], a:255 })).concat([{ r:0, g:0, b:0, a:0 }]);
+}
+
 // traces the CURRENT design (with added text if any) → { svg, w, h }
 async function vectorize(slot){
   if(!window.ImageTracer) throw new Error('Vector tool not loaded — refresh the page');
-  const P = VEC_LEVELS[$('#vecLevel').value] || VEC_LEVELS.detailed;
+  const P = VEC_LEVELS[$('#vecLevel').value] || VEC_LEVELS.balanced;
   const img = await loadImageEl(slot._url);
   const sc = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
   const c0 = document.createElement('canvas');
@@ -1089,15 +1202,14 @@ async function vectorize(slot){
   const ctx = c.getContext('2d', { willReadFrequently:true });
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(c0, bb.x, bb.y, bb.w, bb.h, 0, 0, w, h);
-  const id = ctx.getImageData(0, 0, w, h), d = id.data;
-  for(let i = 0; i < d.length; i += 4){                      // hard alpha → no ghost fringe in the vector
-    if(d[i+3] < 128){ d[i] = d[i+1] = d[i+2] = 0; d[i+3] = 0; } else d[i+3] = 255;
-  }
+  const id = ctx.getImageData(0, 0, w, h);
   await sleep(30);
+  const pal = await cleanQuantize(id, P);                    // flat palette, no speckles
+  await sleep(0);
   let svg = ImageTracer.imagedataToSVG(id, {
-    numberofcolors: P.colors, colorsampling: 2, colorquantcycles: P.cycles, mincolorratio: 0,
-    ltres: P.ltres, qtres: P.qtres, pathomit: P.pathomit, blurradius: 0,
-    strokewidth: 0, roundcoords: 2, viewbox: true, desc: false
+    pal, colorsampling: 0, numberofcolors: pal.length, colorquantcycles: 1, mincolorratio: 0,
+    ltres: P.ltres, qtres: P.qtres, pathomit: P.pathomit, rightangleenhance: false, blurradius: 0,
+    strokewidth: 1, roundcoords: 2, viewbox: true, desc: false   // strokewidth 1 hides hairline seams between colors
   });
   svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')    // drop the transparent "color"
            .replace('<svg ', `<svg width="${w}" height="${h}" `);
@@ -1519,7 +1631,7 @@ async function applyText(andDownload){
     if(newText !== slot.dataset.text){ slot.dataset.text = newText; slot._meta = null; }
     slot.querySelector('.img-box').innerHTML = `<img src="${url}" alt="Design with text">`;
     // AI upscale works from the picture without text, so hide it once text is added
-    // (Vector SVG / HD PNG vectorized now include the text)
+    // (Vector SVG / HD PNG vectorized include the text)
     slot.querySelectorAll('.upBtn').forEach(b => b.hidden = true);
     const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
     slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
@@ -1620,4 +1732,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-                                                         </html>
+                                                                      </html>
