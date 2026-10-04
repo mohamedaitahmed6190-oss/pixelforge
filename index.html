@@ -98,6 +98,7 @@
   .check input{margin-top:3px;accent-color:var(--accent)}
   .btn-text{border-color:var(--accent);color:var(--accent)}
   .btn-ai{border-color:#8A2BE2;color:#8A2BE2}
+  .btn-vec{border-color:#0F9D58;color:#0F9D58}
   .aiPanel{display:none;margin-top:8px;padding:10px;border:1px dashed #8A2BE2;border-radius:12px;background:#FAF6FF}
   .aiPanel.show{display:block}
   .aiPanel label{display:block;font-weight:600;font-size:12.5px;margin:0 0 4px}
@@ -223,6 +224,15 @@
       </div>
 
       <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
+
+      <div class="field">
+        <label for="vecLevel">Vector detail <span class="hint">(for ⬇ Vector SVG / HD PNG)</span></label>
+        <select id="vecLevel">
+          <option value="detailed">Detailed (48 colors, most faithful)</option>
+          <option value="balanced">Balanced (24 colors)</option>
+          <option value="clean">Clean (12 colors, best for print)</option>
+        </select>
+      </div>
 
       <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
 
@@ -794,6 +804,7 @@ $('#genBtn').onclick = async () => {
       </div>
       <button class="btn-sec btn-text txtBtn" disabled>✏️ Add text</button>
       <button class="btn-sec dlBtn" disabled>Download PNG</button>
+      <button class="btn-sec btn-vec vecBtn" disabled>⬇ Vector SVG</button>
       <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
       <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
       <button class="btn-sec metaBtn" disabled>Write listing</button>
@@ -917,9 +928,12 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   const txtBtn = slot.querySelector('.txtBtn');
   txtBtn.disabled = false;
   txtBtn.onclick = () => openEditor(slot);
+  const vecBtn = slot.querySelector('.vecBtn');
+  vecBtn.disabled = false;
+  vecBtn.onclick = () => downloadSVG(slot, idx, vecBtn);
   const svgBtn = slot.querySelector('.svgBtn');
   svgBtn.disabled = false;
-  svgBtn.onclick = () => downloadVectorPNG(slot._base, idx, svgBtn);
+  svgBtn.onclick = () => downloadVectorPNG(slot, idx, svgBtn);
   const upBtn = slot.querySelector('.upBtn');
   upBtn.disabled = false;
   upBtn.onclick = () => downloadUpscaled(slot._raw, idx, upBtn, slot.dataset.dark === '1', slot.dataset.universal === '1');
@@ -1052,51 +1066,83 @@ async function download(url, idx, name){
   }
 }
 
-/* ---------- vectorize → HD PNG (sharp edges at print size) ---------- */
-async function downloadVectorPNG(url, idx, btn){
-  if(!window.ImageTracer){ toast('Vector tool not loaded — refresh the page', true); return; }
+/* ---------- vectorizer: real SVG (traced), 3 detail levels ---------- */
+const VEC_LEVELS = {
+  detailed: { size:2048, colors:48, pathomit:6,  ltres:0.6, qtres:0.6, cycles:4 },
+  balanced: { size:1600, colors:24, pathomit:12, ltres:1,   qtres:1,   cycles:3 },
+  clean:    { size:1200, colors:12, pathomit:24, ltres:1.5, qtres:1.5, cycles:3 }
+};
+// traces the CURRENT design (with added text if any) → { svg, w, h }
+async function vectorize(slot){
+  if(!window.ImageTracer) throw new Error('Vector tool not loaded — refresh the page');
+  const P = VEC_LEVELS[$('#vecLevel').value] || VEC_LEVELS.detailed;
+  const img = await loadImageEl(slot._url);
+  const sc = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+  const c0 = document.createElement('canvas');
+  c0.width = Math.max(1, Math.round(img.naturalWidth * sc)); c0.height = Math.max(1, Math.round(img.naturalHeight * sc));
+  const x0 = c0.getContext('2d', { willReadFrequently:true });
+  x0.imageSmoothingQuality = 'high'; x0.drawImage(img, 0, 0, c0.width, c0.height);
+  const bb = alphaBox(c0);                                   // crop transparent margins
+  const k = P.size / Math.max(bb.w, bb.h);
+  const w = Math.max(1, Math.round(bb.w * k)), h = Math.max(1, Math.round(bb.h * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently:true });
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(c0, bb.x, bb.y, bb.w, bb.h, 0, 0, w, h);
+  const id = ctx.getImageData(0, 0, w, h), d = id.data;
+  for(let i = 0; i < d.length; i += 4){                      // hard alpha → no ghost fringe in the vector
+    if(d[i+3] < 128){ d[i] = d[i+1] = d[i+2] = 0; d[i+3] = 0; } else d[i+3] = 255;
+  }
+  await sleep(30);
+  let svg = ImageTracer.imagedataToSVG(id, {
+    numberofcolors: P.colors, colorsampling: 2, colorquantcycles: P.cycles, mincolorratio: 0,
+    ltres: P.ltres, qtres: P.qtres, pathomit: P.pathomit, blurradius: 0,
+    strokewidth: 0, roundcoords: 2, viewbox: true, desc: false
+  });
+  svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')    // drop the transparent "color"
+           .replace('<svg ', `<svg width="${w}" height="${h}" `);
+  return { svg, w, h };
+}
+function saveBlob(blob, name){
+  const u = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = u; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 10000);
+}
+async function downloadSVG(slot, idx, btn){
+  const old = btn.textContent;
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
-  await sleep(50);
   try {
-    // 1) trace the design into vector shapes
-    const img = await loadImageEl(url);
-    const size = 1024;
-    const c = document.createElement('canvas'); c.width = size; c.height = size;
-    const ctx = c.getContext('2d');
-    const s = Math.min(size/img.naturalWidth, size/img.naturalHeight);
-    const w = img.naturalWidth*s, h = img.naturalHeight*s;
-    ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
-    let svg = ImageTracer.imagedataToSVG(ctx.getImageData(0, 0, size, size), {
-      numberofcolors: 24, colorsampling: 2, mincolorratio: 0,
-      ltres: 0.5, qtres: 0.5, pathomit: 8, blurradius: 0,
-      strokewidth: 0, roundcoords: 2, viewbox: true, desc: false
-    });
-    svg = svg.replace(/<path[^>]*opacity="0"[^>]*\/>/g, '')
-             .replace('<svg ', `<svg width="${size}" height="${size}" `);
-
-    // 2) render the vector at print size → razor-sharp PNG
+    const { svg } = await vectorize(slot);
+    saveBlob(new Blob([svg], { type:'image/svg+xml' }), `pod-design-${Date.now()}-${idx+1}.svg`);
+    toast(`SVG saved (${Math.round(svg.length/1024)} KB)`);
+  } catch(e){
+    console.warn(e); toast(e.message || 'Vectorizing failed — try Clean level', true);
+  }
+  btn.disabled = false; btn.textContent = old;
+}
+// vector → razor-sharp PNG at print size
+async function downloadVectorPNG(slot, idx, btn){
+  const old = btn.textContent;
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Vectorizing…';
+  try {
+    const { svg, w, h } = await vectorize(slot);
     const svgUrl = URL.createObjectURL(new Blob([svg], { type:'image/svg+xml' }));
     const vec = await loadImageEl(svgUrl);
-    const bb = alphaBox(c);   // real artwork box inside the 1024 canvas
-    const k = printScale(bb.w, bb.h);
-    const out = document.createElement('canvas'); out.width = Math.round(bb.w * k); out.height = Math.round(bb.h * k);
-    const octx = out.getContext('2d');
-    octx.setTransform(k, 0, 0, k, -bb.x * k, -bb.y * k);
-    octx.drawImage(vec, 0, 0, size, size);
+    const k = printScale(w, h);
+    const out = document.createElement('canvas'); out.width = Math.round(w * k); out.height = Math.round(h * k);
+    const o = out.getContext('2d'); o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+    o.drawImage(vec, 0, 0, out.width, out.height);
     URL.revokeObjectURL(svgUrl);
-
     await new Promise(res => out.toBlob(b => {
       if(!b){ toast('Export failed — try again', true); return res(); }
-      const u = URL.createObjectURL(b), a = document.createElement('a');
-      a.href = u; a.download = `pod-design-${Date.now()}-${idx+1}-HD-print.png`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(u), 10000);
+      saveBlob(b, `pod-design-${Date.now()}-${idx+1}-HD-print.png`);
       res();
     }, 'image/png'));
   } catch(e){
-    toast('Vectorizing failed for this image — use the normal PNG', true);
+    console.warn(e); toast(e.message || 'Vectorizing failed — use the normal PNG', true);
   }
-  btn.disabled = false; btn.textContent = 'HD PNG (vectorized)';
+  btn.disabled = false; btn.textContent = old;
 }
 
 /* ---------- AI upscale (ESRGAN in the browser, free) ---------- */
@@ -1246,9 +1292,11 @@ function renderHistory(){
   });
 }
 
-/* ---------- "Add text myself" setting ---------- */
+/* ---------- settings kept in this browser ---------- */
 try { $('#textLater').checked = localStorage.getItem('pf_text_later') === '1'; } catch(e){}
 $('#textLater').onchange = e => { try { localStorage.setItem('pf_text_later', e.target.checked ? '1' : '0'); } catch(_){} };
+try { const v = localStorage.getItem('pf_vec_level'); if(v && VEC_LEVELS[v]) $('#vecLevel').value = v; } catch(e){}
+$('#vecLevel').onchange = e => { try { localStorage.setItem('pf_vec_level', e.target.value); } catch(_){} };
 
 /* ---------- Text editor: real fonts, always spelled right ---------- */
 const FONTS = [
@@ -1470,8 +1518,9 @@ async function applyText(andDownload){
     const newText = [ED.s.top.text, ED.s.bottom.text].map(t => t.trim()).filter(Boolean).join(' ');
     if(newText !== slot.dataset.text){ slot.dataset.text = newText; slot._meta = null; }
     slot.querySelector('.img-box').innerHTML = `<img src="${url}" alt="Design with text">`;
-    // these tools work from the picture without text, so hide them once text is added
-    slot.querySelectorAll('.svgBtn, .upBtn').forEach(b => b.hidden = true);
+    // AI upscale works from the picture without text, so hide it once text is added
+    // (Vector SVG / HD PNG vectorized now include the text)
+    slot.querySelectorAll('.upBtn').forEach(b => b.hidden = true);
     const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
     slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
     slot.querySelector('.txtBtn').textContent = '✏️ Edit text';
@@ -1571,4 +1620,4 @@ $('#cBtn').onclick = async () => {
 };
 </script>
 </body>
-</html>
+                                                         </html>
