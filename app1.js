@@ -652,7 +652,7 @@ async function runAiEdit(slot){
       body: JSON.stringify({ image: b64, prompt, strength })
     });
     if(r.status === 429){ markFull(); throw new Error('limit'); }
-    if(!r.ok) throw new Error('edit ' + r.status);
+    if(!r.ok){ const t = await r.text().catch(() => ''); throw new Error('edit ' + r.status + ': ' + t.slice(0, 140)); }
     const blob = await r.blob();
     if(!blob.type.startsWith('image/') || blob.size < 500) throw new Error('bad image');
     countImage();
@@ -663,7 +663,7 @@ async function runAiEdit(slot){
     toast('Edited ✓ — tap Undo if you prefer the old one');
   } catch(e){
     console.warn(e);
-    toast(String(e.message) === 'limit' ? 'Daily limit reached' : 'AI edit failed — try again', true);
+    toast(String(e.message) === 'limit' ? 'Daily limit reached' : String(e.message).slice(0, 160), true);
   }
   go.disabled = false; go.textContent = 'Apply AI edit';
 }
@@ -675,7 +675,7 @@ async function undoAiEdit(slot){
 }
 
 /* ---------- print export (artwork >= 5000 x 5500 without transparent margins) ---------- */
-const PRINT_W = 5000, PRINT_H = 5500, MAX_SIDE = 10000;
+const PRINT_W = 6000, PRINT_H = 6500, MAX_SIDE = 10000;
 const RAW_URLS = new Set();   // files that are already print-ready (text added)
 // bounding box of the visible (non-transparent) pixels of a canvas
 function alphaBox(c){
@@ -735,4 +735,4 @@ async function download(url, idx, name){
     toast('Could not export at print size — opening original', true);
     window.open(url, '_blank');
   }
-     }
+}
