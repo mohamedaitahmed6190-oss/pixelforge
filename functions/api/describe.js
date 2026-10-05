@@ -1,4 +1,4 @@
-const PROMPT = 'Describe this image as a short prompt for an illustration generator, maximum 30 words. Mention only the main subject, pose, expression, main colors and props. Use generic wording: never name any character, brand, sports team, band, celebrity or logo, describe their look generically instead. Do not mention text, letters, art style or background.';
+const PROMPT = 'Describe the main subject of this image in under 25 words for an illustration generator. Start with the exact type of animal, person or object and its breed or kind (for example highland cow, french bulldog, black cat), then its key features, main colors, pose and props. Use generic wording: never name any character, brand, sports team, band, celebrity or logo, describe their look generically instead. Do not mention text, letters, art style or background.';
 
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
@@ -14,7 +14,7 @@ export async function onRequestPost({ request, env }) {
     const out = await env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
       image: [...bytes],
       prompt: PROMPT,
-      max_tokens: 120
+      max_tokens: 80
     });
     const description = String(out.description || out.response || '').trim();
     if (!description) return json({ error: 'empty' }, 502);
