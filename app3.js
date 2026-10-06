@@ -1,18 +1,37 @@
 /* ---------- Text editor: real fonts, always spelled right ---------- */
-const FONTS = [
-  ['Luckiest Guy',400],['Bebas Neue',400],['Anton',400],['Oswald',700],['Bangers',400],
-  ['Permanent Marker',400],['Righteous',400],['Shrikhand',400],['Fredoka',600],
-  ['Pacifico',400],['Lobster',400],['Satisfy',400],['Great Vibes',400],
-  ['Cinzel',800],['Playfair Display',800],['Rye',400],['Creepster',400]
+// all fonts are free Google Fonts (SIL Open Font License: OK for commercial use on shirts)
+const FONT_GROUPS = [
+  ['Drip & horror', [['Creepster',400],['Nosifer',400],['Eater',400],['Butcherman',400],['Rubik Wet Paint',400],['Metal Mania',400],['Jolly Lodger',400],['New Rocker',400],['Pirata One',400],['UnifrakturCook',700],['Henny Penny',400],['Frijole',400],['Griffy',400],['Mystery Quest',400],['Emilys Candy',400],['Ribeye Marrow',400]]],
+  ['Bold & chunky', [['Luckiest Guy',400],['Anton',400],['Bangers',400],['Titan One',400],['Sigmar One',400],['Bowlby One',400],['Lilita One',400],['Chango',400],['Modak',400],['Bagel Fat One',400],['Londrina Solid',900],['Chewy',400],['Boogaloo',400],['Wendy One',400],['Bungee',400],['Black Ops One',400],['Rampart One',400],['Faster One',400],['Fontdiner Swanky',400],['Kranky',400],['Freckle Face',400],['Nerko One',400],['Lacquer',400]]],
+  ['Clean & condensed', [['Bebas Neue',400],['Oswald',700],['Righteous',400],['Fredoka',600]]],
+  ['Script & handwritten', [['Pacifico',400],['Lobster',400],['Satisfy',400],['Great Vibes',400],['Shrikhand',400],['Permanent Marker',400],['Rock Salt',400],['Knewave',400],['Sedgwick Ave Display',400],['Caveat Brush',400],['Gloria Hallelujah',400]]],
+  ['Vintage & serif', [['Cinzel',800],['Playfair Display',800],['Rye',400],['Special Elite',400],['Trade Winds',400]]],
+  ['Retro & grunge', [['Monoton',400],['Press Start 2P',400],['Rubik Glitch',400],['Rubik Spray Paint',400],['Rubik Beastly',400],['Rubik Microbe',400],['Barriecito',400]]]
 ];
-const EW = 1000, EH = 1100;            // editor space (same ratio as 5000x5500)
+const FONTS = FONT_GROUPS.flatMap(g => g[1]);
+// these 17 are already loaded by index.html, the rest are loaded here
+const BASE_FONTS = new Set(['Anton','Bangers','Bebas Neue','Cinzel','Creepster','Fredoka','Great Vibes','Lobster','Luckiest Guy','Oswald','Pacifico','Permanent Marker','Playfair Display','Righteous','Rye','Satisfy','Shrikhand']);
+const extraFontsReady = new Promise(res => {
+  const extra = FONTS.filter(([f]) => !BASE_FONTS.has(f));
+  const l = document.createElement('link'); l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?' + extra.map(([f, w]) => 'family=' + f.replace(/ /g, '+') + (w !== 400 ? ':wght@' + w : '')).join('&') + '&display=swap';
+  l.onload = () => res(); l.onerror = () => res();
+  document.head.appendChild(l);
+});
 const ED = { slot:null, img:null, cur:'top', s:null, bg:'checker' };
+const EW = 1000, EH = 1100;            // editor space (same ratio as 5000x5500)
 const edCv = $('#edCanvas'), edCtx = edCv.getContext('2d');
-FONTS.forEach(([f]) => { const o = document.createElement('option'); o.value = f; o.textContent = f; o.style.fontFamily = `"${f}"`; $('#edFont').appendChild(o); });
-let fontsReady = null;
+FONT_GROUPS.forEach(([label, list]) => {
+  const g = document.createElement('optgroup'); g.label = label;
+  list.forEach(([f]) => { const o = document.createElement('option'); o.value = f; o.textContent = f; o.style.fontFamily = `"${f}"`; g.appendChild(o); });
+  $('#edFont').appendChild(g);
+});
+// loads only the fonts the two lines use (fast, even with 60 fonts in the list)
 function loadFonts(){
-  if(!fontsReady) fontsReady = Promise.all(FONTS.map(([f,w]) => document.fonts.load(`${w} 40px "${f}"`).catch(()=>{})));
-  return fontsReady;
+  return extraFontsReady.then(() => {
+    const used = ED.s ? [ED.s.top.font, ED.s.bottom.font] : [];
+    return Promise.all(used.map(f => document.fonts.load(`${fontWeight(f)} 40px "${f}"`).catch(() => {})));
+  });
 }
 function fontWeight(name){ const f = FONTS.find(x => x[0] === name); return f ? f[1] : 400; }
 
