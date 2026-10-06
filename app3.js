@@ -285,7 +285,7 @@ $('#simGo').onclick = async () => {
     const d = await r.json().catch(() => ({}));
     if(!r.ok || d.error || !d.description) throw new Error(d.error || 'no description');
     let desc = String(d.description).replace(/\s+/g, ' ').trim().replace(/[."\s]+$/, '');
-    if(desc.length > 150){ desc = desc.slice(0, 150); desc = desc.slice(0, desc.lastIndexOf(' ') > 60 ? desc.lastIndexOf(' ') : 150); }  // the server cuts prompts at 800 chars
+    if(desc.length > 450){ desc = desc.slice(0, 450); desc = desc.slice(0, desc.lastIndexOf(' ') > 200 ? desc.lastIndexOf(' ') : 450); }  // the server cuts prompts at 800 chars
     $('#idea').value = `${desc}, ${SIM_CLAUSES[$('#simLevel').value] || SIM_CLAUSES.mid}`;
     $('#exactText').value = '';
     ok = true;
