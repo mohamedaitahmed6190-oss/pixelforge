@@ -134,6 +134,7 @@
   /* similar image + vector panel */
   .sim-thumb{display:block;width:100%;max-height:200px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#FAFBFC;margin-top:8px}
   .sim-thumb[hidden]{display:none}
+  .sim-thumb.checker{background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .vp-prev{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;
     background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .vp-prev.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
@@ -325,6 +326,18 @@
       <button id="upPick" class="btn-sec" type="button" style="margin-top:0">🖼 Choose design</button>
       <img id="upThumb" class="sim-thumb" alt="Selected design" hidden>
       <button id="upGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬆ Upscale to high res & download</button>
+
+      <div class="divider"></div>
+      <h3 class="tool-title">Remove background</h3>
+      <p class="note" style="margin:4px 0 12px">Upload a design on a solid / flat background and get a clean transparent PNG. Keeps white parts inside the subject. Works best when the background is one flat color with a little margin.</p>
+      <input type="file" id="rbFile" accept="image/*" style="display:none">
+      <button id="rbPick" class="btn-sec" type="button" style="margin-top:0">🧽 Choose design</button>
+      <img id="rbThumb" class="sim-thumb" alt="Selected design" hidden>
+      <div class="field" style="margin-top:12px">
+        <label for="rbTol">Strength: <span id="rbTolV">45</span> <span class="hint">(keeps more ← → removes more)</span></label>
+        <input id="rbTol" type="range" min="10" max="120" value="45">
+      </div>
+      <button id="rbGo" class="btn-sec" type="button" disabled>⬇ Remove background & download</button>
 
     </aside>
 
@@ -607,8 +620,130 @@
     go.disabled = false; go.textContent = old;
   };
 })();
+
+/* ---------- Remove background (flood-fill from the edges, keeps white inside the subject) ---------- */
+(function(){
+  const pick = document.getElementById('rbPick');
+  const file = document.getElementById('rbFile');
+  const thumb = document.getElementById('rbThumb');
+  const tol = document.getElementById('rbTol');
+  const tolV = document.getElementById('rbTolV');
+  const go = document.getElementById('rbGo');
+  if(!pick || !file || !go) return;
+  let imgUrl = null, imgName = 'design';
+
+  if(tol) tol.oninput = () => { tolV.textContent = tol.value; };
+
+  pick.onclick = () => file.click();
+  file.onchange = () => {
+    const f = file.files && file.files[0];
+    if(!f) return;
+    if(imgUrl) URL.revokeObjectURL(imgUrl);
+    imgUrl = URL.createObjectURL(f);
+    imgName = (f.name || 'design').replace(/\.[^.]+$/, '').slice(0, 60) || 'design';
+    thumb.src = imgUrl; thumb.hidden = false; thumb.classList.remove('checker');
+    go.disabled = false;
+    file.value = '';
+  };
+
+  const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+  // Returns a full-resolution canvas with the background removed.
+  function removeBgCanvas(img, T){
+    const W = img.naturalWidth, H = img.naturalHeight;
+    // compute the background mask at a capped size (fast), apply at full size
+    const MAXW = 2000;
+    const sc = Math.min(1, MAXW / Math.max(W, H));
+    const w = Math.max(1, Math.round(W * sc)), h = Math.max(1, Math.round(H * sc));
+    const wc = cv(w, h), wx = wc.getContext('2d', { willReadFrequently:true });
+    wx.imageSmoothingEnabled = true; wx.imageSmoothingQuality = 'high';
+    wx.drawImage(img, 0, 0, w, h);
+    const id = wx.getImageData(0, 0, w, h), d = id.data, n = w * h;
+
+    // reference background colour = median of the border pixels (robust)
+    const rs = [], gs = [], bs = []; let trans = 0, tot = 0;
+    const sample = p => { const i = p * 4; tot++; if(d[i+3] < 20){ trans++; return; } rs.push(d[i]); gs.push(d[i+1]); bs.push(d[i+2]); };
+    for(let x = 0; x < w; x++){ sample(x); sample((h-1)*w + x); }
+    for(let y = 0; y < h; y++){ sample(y*w); sample(y*w + w - 1); }
+    const med = a => a.length ? a.slice().sort((p,q)=>p-q)[a.length>>1] : 0;
+    const ref = [med(rs), med(gs), med(bs)];
+    const refTransparent = trans > tot * 0.5;   // border is already mostly transparent
+
+    const bg = new Uint8Array(n), stack = new Int32Array(n);
+    let sp = 0;
+    const T2 = T * T * 3;
+    const push = p => { if(!bg[p]){ bg[p] = 1; stack[sp++] = p; } };
+    const like = i => {
+      if(d[i+3] < 20) return true;             // transparent = background
+      if(refTransparent) return false;
+      const dr = d[i]-ref[0], dg = d[i+1]-ref[1], db = d[i+2]-ref[2];
+      return dr*dr + dg*dg + db*db <= T2;
+    };
+    for(let x = 0; x < w; x++){ let p = x; if(like(p*4)) push(p); p = (h-1)*w + x; if(like(p*4)) push(p); }
+    for(let y = 0; y < h; y++){ let p = y*w; if(like(p*4)) push(p); p = y*w + w - 1; if(like(p*4)) push(p); }
+    while(sp){
+      const p = stack[--sp], x = p % w, y = (p/w)|0;
+      if(x>0){ const q=p-1; if(!bg[q] && like(q*4)) push(q); }
+      if(x<w-1){ const q=p+1; if(!bg[q] && like(q*4)) push(q); }
+      if(y>0){ const q=p-w; if(!bg[q] && like(q*4)) push(q); }
+      if(y<h-1){ const q=p+w; if(!bg[q] && like(q*4)) push(q); }
+    }
+
+    // eat the 1-2px antialiased fringe left around the subject
+    const F = T * 2.2, F2 = F * F * 3;
+    for(let pass = 0; pass < 2; pass++){
+      const add = [];
+      for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+        const p = y*w + x; if(bg[p]) continue;
+        const near = (x>0&&bg[p-1]) || (x<w-1&&bg[p+1]) || (y>0&&bg[p-w]) || (y<h-1&&bg[p+w]);
+        if(!near) continue;
+        const i = p*4;
+        if(d[i+3] < 20){ add.push(p); continue; }
+        if(!refTransparent){ const dr=d[i]-ref[0],dg=d[i+1]-ref[1],db=d[i+2]-ref[2]; if(dr*dr+dg*dg+db*db <= F2) add.push(p); }
+      }
+      for(const p of add) bg[p] = 1;
+    }
+
+    // white mask where we keep, transparent where we remove
+    const mData = wx.createImageData(w, h), m = mData.data;
+    for(let p = 0; p < n; p++){ const i = p*4; m[i]=255; m[i+1]=255; m[i+2]=255; m[i+3] = bg[p] ? 0 : 255; }
+    const maskSmall = cv(w, h); maskSmall.getContext('2d').putImageData(mData, 0, 0);
+
+    // apply at full resolution
+    const out = cv(W, H), o = out.getContext('2d');
+    o.drawImage(img, 0, 0);
+    o.globalCompositeOperation = 'destination-in';
+    o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+    o.drawImage(maskSmall, 0, 0, W, H);   // mask scaled up (smooth edges)
+    o.globalCompositeOperation = 'source-over';
+    return out;
+  }
+
+  go.onclick = async () => {
+    if(!imgUrl) return;
+    const old = go.textContent;
+    go.disabled = true; go.innerHTML = '<span class="spin"></span> Removing…';
+    try {
+      const img = await loadImageEl(imgUrl);
+      await new Promise(r => setTimeout(r, 20));
+      const out = removeBgCanvas(img, +tol.value);
+      // show the result (on a checker so transparency is visible)
+      thumb.src = out.toDataURL('image/png'); thumb.classList.add('checker');
+      await new Promise(res => out.toBlob(b => {
+        if(!b){ toast('Remove failed — try again', true); return res(); }
+        saveBlob(b, `${imgName}-no-bg.png`);
+        toast('Background removed ✓');
+        res();
+      }, 'image/png'));
+    } catch(e){
+      console.warn(e);
+      toast('Could not remove the background — try a flatter background', true);
+    }
+    go.disabled = false; go.textContent = old;
+  };
+})();
 </script>
 
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
-        </html>
+                                                                                                                          </html>
