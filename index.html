@@ -310,6 +310,14 @@
       <button id="cBtn" class="btn-sec" type="button">Generate 10 concepts</button>
       <div id="concepts"></div>
 
+      <div class="divider"></div>
+      <h3 class="tool-title">Resize design to 6000×6500</h3>
+      <p class="note" style="margin:4px 0 12px">Upload a finished design and download it at exactly 6000×6500 px — kept as-is, no distortion (scaled to fit, centered, any transparency kept). Ready for POD upload.</p>
+      <input type="file" id="rsFile" accept="image/*" style="display:none">
+      <button id="rsPick" class="btn-sec" type="button" style="margin-top:0">📐 Choose design</button>
+      <img id="rsThumb" class="sim-thumb" alt="Selected design" hidden>
+      <button id="rsGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬇ Resize to 6000×6500 & download</button>
+
     </aside>
 
     <section>
@@ -442,6 +450,56 @@
 <script src="/app1.js?v=8"></script>
 <script src="/app2.js?v=8"></script>
 <script src="/app3.js?v=8"></script>
+<script>
+/* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
+(function(){
+  const RS_W = 6000, RS_H = 6500;
+  const pick = document.getElementById('rsPick');
+  const file = document.getElementById('rsFile');
+  const thumb = document.getElementById('rsThumb');
+  const go = document.getElementById('rsGo');
+  if(!pick || !file || !go) return;
+  let imgUrl = null, imgName = 'design';
+
+  pick.onclick = () => file.click();
+  file.onchange = () => {
+    const f = file.files && file.files[0];
+    if(!f) return;
+    if(imgUrl) URL.revokeObjectURL(imgUrl);
+    imgUrl = URL.createObjectURL(f);
+    imgName = (f.name || 'design').replace(/\.[^.]+$/, '').slice(0, 60) || 'design';
+    thumb.src = imgUrl; thumb.hidden = false;
+    go.disabled = false;
+    file.value = '';
+  };
+
+  go.onclick = async () => {
+    if(!imgUrl) return;
+    const old = go.textContent;
+    go.disabled = true; go.innerHTML = '<span class="spin"></span> Resizing…';
+    try {
+      const img = await loadImageEl(imgUrl);
+      const c = document.createElement('canvas');
+      c.width = RS_W; c.height = RS_H;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      const k = Math.min(RS_W / img.naturalWidth, RS_H / img.naturalHeight);   // fit, keep aspect ratio (no distortion)
+      const w = img.naturalWidth * k, h = img.naturalHeight * k;
+      ctx.drawImage(img, (RS_W - w) / 2, (RS_H - h) / 2, w, h);                 // centered, unchanged
+      await new Promise(res => c.toBlob(b => {
+        if(!b){ toast('Resize failed — try again', true); return res(); }
+        saveBlob(b, `${imgName}-6000x6500.png`);
+        toast('Saved at 6000×6500 ✓');
+        res();
+      }, 'image/png'));
+    } catch(e){
+      console.warn(e);
+      toast('Could not resize this image — try a PNG or JPG', true);
+    }
+    go.disabled = false; go.textContent = old;
+  };
+})();
+</script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
-</html>
+          </html>
