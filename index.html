@@ -318,6 +318,14 @@
       <img id="rsThumb" class="sim-thumb" alt="Selected design" hidden>
       <button id="rsGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬇ Resize to 6000×6500 & download</button>
 
+      <div class="divider"></div>
+      <h3 class="tool-title">Upscale to high resolution</h3>
+      <p class="note" style="margin:4px 0 12px">Upload a finished design and the AI re-draws it sharper at high resolution — fixes blurry / soft art, keeps your design and transparency unchanged. Great for TeePublic, Redbubble… (small images take ~1 min, all free in your browser).</p>
+      <input type="file" id="upFile" accept="image/*" style="display:none">
+      <button id="upPick" class="btn-sec" type="button" style="margin-top:0">🖼 Choose design</button>
+      <img id="upThumb" class="sim-thumb" alt="Selected design" hidden>
+      <button id="upGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬆ Upscale to high res & download</button>
+
     </aside>
 
     <section>
@@ -450,6 +458,7 @@
 <script src="/app1.js?v=8"></script>
 <script src="/app2.js?v=8"></script>
 <script src="/app3.js?v=8"></script>
+
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
 (function(){
@@ -499,7 +508,111 @@
     go.disabled = false; go.textContent = old;
   };
 })();
+
+/* ---------- Upscale a finished design to high resolution (AI, sharper, transparency kept) ---------- */
+(function(){
+  const pick = document.getElementById('upPick');
+  const file = document.getElementById('upFile');
+  const thumb = document.getElementById('upThumb');
+  const go = document.getElementById('upGo');
+  if(!pick || !file || !go) return;
+  const TARGET = 6000, MAXOUT = 10000;
+  let imgUrl = null, imgName = 'design';
+
+  pick.onclick = () => file.click();
+  file.onchange = () => {
+    const f = file.files && file.files[0];
+    if(!f) return;
+    if(imgUrl) URL.revokeObjectURL(imgUrl);
+    imgUrl = URL.createObjectURL(f);
+    imgName = (f.name || 'design').replace(/\.[^.]+$/, '').slice(0, 60) || 'design';
+    thumb.src = imgUrl; thumb.hidden = false;
+    go.disabled = false;
+    file.value = '';
+  };
+
+  const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+  // high-quality resize to w×h (keeps transparency)
+  function scaleHQ(src, w, h){
+    const c = cv(w, h), x = c.getContext('2d');
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(src, 0, 0, w, h);
+    return c;
+  }
+  // bleed edge colors outward then flatten on white -> opaque input for the AI (no dark/white halo)
+  function opaqueBled(img){
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const rad = Math.max(2, Math.round(Math.min(w, h) * 0.012));
+    const sp = cv(w, h), s = sp.getContext('2d');
+    for(let a = 0; a < 24; a++){ const t = a / 24 * Math.PI * 2; s.drawImage(img, Math.cos(t) * rad, Math.sin(t) * rad); }
+    s.drawImage(img, 0, 0);
+    const c = cv(w, h), o = c.getContext('2d');
+    o.fillStyle = '#FFFFFF'; o.fillRect(0, 0, w, h); o.drawImage(sp, 0, 0);
+    return c;
+  }
+
+  go.onclick = async () => {
+    if(!imgUrl) return;
+    const old = go.textContent;
+    go.disabled = true; go.innerHTML = '<span class="spin"></span> Loading AI…';
+    try {
+      const img = await loadImageEl(imgUrl);
+      const maxSide = Math.max(img.naturalWidth, img.naturalHeight);
+      // small images need more help; large ones are already high-res
+      const passes = maxSide < 1500 ? 2 : maxSide < 3000 ? 1 : 0;
+
+      let outCanvas;
+      if(passes === 0){
+        // already high-res: keep exactly as-is, only enlarge to target if smaller (alpha kept natively)
+        let k = 1;
+        if(maxSide < TARGET) k = Math.min(TARGET / maxSide, 2.2);
+        const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+        outCanvas = scaleHQ(img, w, h);
+        go.innerHTML = '<span class="spin"></span> Finishing…';
+      } else {
+        const up = await getUpscaler();
+        // feed the AI an opaque (bled) copy so transparency never turns into a dark edge
+        let cur = await loadImageEl(opaqueBled(img).toDataURL('image/png'));
+        for(let p = 0; p < passes; p++){
+          const tag = passes > 1 ? `(pass ${p + 1}/${passes}) ` : '';
+          go.innerHTML = `<span class="spin"></span> Upscaling ${tag}0%`;
+          const src = await up.upscale(cur, {
+            patchSize: 64, padding: 6,
+            progress: pr => { go.innerHTML = `<span class="spin"></span> Upscaling ${tag}${Math.round(pr * 100)}%`; }
+          });
+          cur = await loadImageEl(src);
+        }
+        go.innerHTML = '<span class="spin"></span> Finishing…';
+        // final size: never downscale below the AI output; bump up to TARGET if small; cap at MAXOUT
+        let longest = Math.max(cur.naturalWidth, cur.naturalHeight), k = 1;
+        if(longest < TARGET) k = Math.min(TARGET / longest, 2.2);
+        if(longest * k > MAXOUT) k = MAXOUT / longest;
+        const w = Math.round(cur.naturalWidth * k), h = Math.round(cur.naturalHeight * k);
+        outCanvas = scaleHQ(cur, w, h);                       // sharp, opaque RGB
+        // put the original transparency back (smoothly upscaled) — crisp cut, no halo
+        const mask = scaleHQ(img, outCanvas.width, outCanvas.height);
+        const o = outCanvas.getContext('2d');
+        o.globalCompositeOperation = 'destination-in';
+        o.drawImage(mask, 0, 0);
+        o.globalCompositeOperation = 'source-over';
+      }
+
+      await new Promise(res => outCanvas.toBlob(b => {
+        if(!b){ toast('Upscale failed — try again', true); return res(); }
+        saveBlob(b, `${imgName}-${outCanvas.width}x${outCanvas.height}-HD.png`);
+        toast(`Saved at ${outCanvas.width}×${outCanvas.height} ✓`);
+        res();
+      }, 'image/png'));
+    } catch(e){
+      console.warn(e);
+      toast('Upscale failed — try again or use a smaller image', true);
+    }
+    go.disabled = false; go.textContent = old;
+  };
+})();
 </script>
+
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
-          </html>
+        </html>
