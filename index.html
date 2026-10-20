@@ -459,8 +459,8 @@
         <div class="field" style="margin-top:12px">
           <label for="upMode">Result</label>
           <select id="upMode">
-            <option value="crisp">Razor-sharp (vector) — stays clear at any size, colors simplified</option>
-            <option value="ai">Keep exact colors (AI) — can look soft when enlarged a lot</option>
+            <option value="ai">Detailed &amp; true colors (AI) — keeps gradients and textures</option>
+            <option value="crisp">Flat &amp; razor-sharp (vector) — colors simplified</option>
           </select>
         </div>
         <button id="upGo" class="btn-sec" type="button" disabled style="margin-top:12px" data-ic="upscale">Upscale to high res & download</button>
@@ -645,9 +645,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=25"></script>
-<script src="/app2.js?v=25"></script>
-<script src="/app3.js?v=25"></script>
+<script src="/app1.js?v=26"></script>
+<script src="/app2.js?v=26"></script>
+<script src="/app3.js?v=26"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -765,8 +765,8 @@
   }
 
   const modeSel = document.getElementById('upMode');
-  try { const m = localStorage.getItem('pf_up_mode'); if(m === 'ai' || m === 'crisp') modeSel.value = m; } catch(e){}
-  modeSel.onchange = () => { try { localStorage.setItem('pf_up_mode', modeSel.value); } catch(e){} };
+  try { const m = localStorage.getItem('pf_up_mode2'); if(m === 'ai' || m === 'crisp') modeSel.value = m; } catch(e){}
+  modeSel.onchange = () => { try { localStorage.setItem('pf_up_mode2', modeSel.value); } catch(e){} };
 
   go.onclick = async () => {
     if(!imgUrl) return;
@@ -840,7 +840,15 @@
           toast('AI is too heavy for this device — used standard upscaling');
           upscaler = null;
           go.innerHTML = '<span class="spin"></span> Finishing…';
-          sharp = scaleHQ(img, img.naturalWidth * 2, img.naturalHeight * 2);
+          let cur = img, step = 0;
+          const target = 3000;   // grow in 2x steps, light sharpening after each → crisper than one big jump
+          while(Math.max(cur.naturalWidth || cur.width, cur.naturalHeight || cur.height) < target && step < 3){
+            const w0 = cur.naturalWidth || cur.width, h0 = cur.naturalHeight || cur.height;
+            cur = scaleHQ(cur, w0 * 2, h0 * 2);
+            go.innerHTML = '<span class="spin"></span> Enhancing…';
+            await sharpen(cur, 1.0, 0.7); step++;
+          }
+          sharp = cur.getContext ? cur : scaleHQ(cur, cur.naturalWidth * 2, cur.naturalHeight * 2);
         }
       }
 
@@ -991,7 +999,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=25"></script>
+<script src="/app4.js?v=26"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
