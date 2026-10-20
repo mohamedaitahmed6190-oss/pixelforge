@@ -12,6 +12,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.WindowManager;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -68,6 +69,11 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setSupportZoom(false);
         s.setMediaPlaybackRequiresUserGesture(false);
+        // Cloudflare Access / Google sign-in must run inside the app so the session cookie lands here
+        s.setUserAgentString(s.getUserAgentString().replace("; wv", ""));
+        CookieManager cm = CookieManager.getInstance();
+        cm.setAcceptCookie(true);
+        cm.setAcceptThirdPartyCookies(web, true);
 
         web.addJavascriptInterface(new Bridge(), "PFAndroid");
 
@@ -77,7 +83,9 @@ public class MainActivity extends Activity {
                 Uri u = request.getUrl();
                 String scheme = u.getScheme() == null ? "" : u.getScheme();
                 if (scheme.equals("blob") || scheme.equals("data") || scheme.equals("about")) return true;
-                if (HOST.equals(u.getHost())) return false;
+                String host = u.getHost() == null ? "" : u.getHost();
+                // only the TeePublic upload page goes to the browser; everything else (incl. login) stays in the app
+                if (!host.endsWith("teepublic.com")) return false;
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) { }
                 return true;
             }
@@ -121,6 +129,12 @@ public class MainActivity extends Activity {
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();
     }
 
     @Override
