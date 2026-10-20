@@ -10,7 +10,7 @@ const DEFAULT_T = {
   snap:true, ignoreWhite:false,
   res:1200           // working size of the trace
 };
-// quick buttons (⬇ Vector SVG / HD PNG vectorized)
+// quick buttons (Vector SVG / HD PNG vectorized)
 const QUICK = {
   detailed: Object.assign({}, DEFAULT_T, { colors:24, paths:80, corners:50, noise:6,  res:1600 }),
   balanced: Object.assign({}, DEFAULT_T, { colors:16, paths:65, corners:60, noise:12, res:1400 }),
@@ -427,11 +427,11 @@ async function teepublicKit(slot, finalUrl, idx, idea, product, style){
     panel.classList.add('show');
     panel.querySelectorAll('[data-kit]').forEach(b => b.onclick = () => copyText(fields[b.dataset.kit][1], b));
     panel.querySelector('[data-redl]').onclick = () => download(finalUrl, idx, file);
-    btn.textContent = '🚀 TeePublic kit ready';
+    btn.textContent = 'TeePublic kit ready';
   } catch(e){
     console.warn(e);
     toast('Could not prepare the kit — try again', true);
-    btn.textContent = '🚀 TeePublic kit';
+    btn.textContent = 'TeePublic kit';
   }
   btn.disabled = false;
 }

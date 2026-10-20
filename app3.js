@@ -241,8 +241,8 @@ async function applyText(andDownload){
     // (Vector panel / Vector SVG / HD PNG vectorized include the text)
     slot.querySelectorAll('.upBtn').forEach(b => b.hidden = true);
     const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
-    slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
-    slot.querySelector('.txtBtn').textContent = '✏️ Edit text';
+    slot.querySelector('.kitBtn').textContent = 'TeePublic kit';
+    slot.querySelector('.txtBtn').textContent = 'Edit text';
     history.unshift({ url, prompt:'text' }); renderHistory();
     closeEditor();
     if(andDownload) download(url, slot._idx || 0);
@@ -311,7 +311,7 @@ $('#simGo').onclick = async () => {
   } catch(err){
     console.warn(err); toast('Could not analyze the image — try again', true);
   }
-  btn.disabled = false; btn.textContent = '✨ Create similar designs';
+  btn.disabled = false; btn.textContent = 'Create similar designs';
   if(ok){ toast('Description ready — generating 2 designs…'); $('#genBtn').click(); }
 };
 

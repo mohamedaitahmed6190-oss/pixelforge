@@ -278,13 +278,13 @@ function saveCustom(o){ try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(o)
 
 const nicheSel = $('#niche'), sugSel = $('#suggest');
 const gMine = document.createElement('optgroup'); gMine.label = 'Yours';
-const mine = document.createElement('option'); mine.value = 'mine'; mine.textContent = '✏️ My own ideas';
+const mine = document.createElement('option'); mine.value = 'mine'; mine.textContent = 'My own ideas';
 gMine.appendChild(mine);
 const gHot = document.createElement('optgroup'); gHot.label = 'Trending this season';
 const gAll = document.createElement('optgroup'); gAll.label = 'Evergreen';
 NICHES.forEach((n, i) => {
   const o = document.createElement('option');
-  o.value = i; o.textContent = (n.hot ? '🔥 ' : '') + n.name;
+  o.value = i; o.textContent = (n.hot ? '★ ' : '') + n.name;
   (n.hot ? gHot : gAll).appendChild(o);
 });
 nicheSel.append(gMine, gHot, gAll);
@@ -297,8 +297,8 @@ function builtinList(){ return nicheSel.value === 'mine' ? [] : NICHES[nicheSel.
 function fillIdeas(selectValue){
   sugSel.innerHTML = '';
   const add = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; sugSel.appendChild(o); };
-  add('new', '✏️ Write my own idea');
-  customList().forEach(([d, t], i) => add('c' + i, '⭐ ' + (t ? `${d} — "${t}"` : `${d} (no text)`)));
+  add('new', 'Write my own idea');
+  customList().forEach(([d, t], i) => add('c' + i, '★ ' + (t ? `${d} — "${t}"` : `${d} (no text)`)));
   builtinList().forEach(([d, t], i) => add('b' + i, t ? `${d} — "${t}"` : `${d} (no text)`));
   sugSel.value = selectValue || (sugSel.options.length > 1 ? sugSel.options[1].value : 'new');
   applyIdea();
@@ -454,26 +454,26 @@ function makeCard(prompt, ideaVal, productLabel, styleLabel){
   d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
   d._prompt = prompt; d._idea = ideaVal; d._prod = productLabel; d._style = styleLabel;
   d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
-    <button class="btn-sec btn-main wide dlBtn" disabled>⬇ Download PNG</button>
-    <button class="btn-sec txtBtn" disabled>✏️ Add text</button>
-    <button class="btn-sec aiBtn" disabled>🪄 AI edit</button>
+    <button class="btn-sec btn-main wide dlBtn" data-ic="download" disabled>Download PNG</button>
+    <button class="btn-sec txtBtn" data-ic="type" disabled>Add text</button>
+    <button class="btn-sec aiBtn" data-ic="wand" disabled>AI edit</button>
     <div class="aiPanel">
       <label>What to change? <span class="hint">(short, English)</span></label>
       <input class="aiText" type="text" placeholder="e.g. change the dog to a pug">
       <label>Change strength: <span class="aiStrVal">40</span>% <span class="hint">(low = keeps design)</span></label>
       <input class="aiStr" type="range" min="15" max="75" value="40">
       <button class="gen aiGo" type="button">Apply AI edit</button>
-      <button class="btn-sec aiUndo" type="button" hidden>↩ Undo last edit</button>
+      <button class="btn-sec aiUndo" type="button" data-ic="undo" hidden>Undo last edit</button>
     </div>
-    <button class="btn-sec mkBtn" disabled>👕 Mockup</button>
-    <button class="btn-sec rrBtn" disabled>🔄 Re-roll</button>
-    <button class="btn-sec wide kitBtn" disabled>🚀 TeePublic kit</button>
+    <button class="btn-sec mkBtn" data-ic="shirt" disabled>Mockup</button>
+    <button class="btn-sec rrBtn" data-ic="refresh" disabled>Re-roll</button>
+    <button class="btn-sec wide kitBtn" data-ic="rocket" disabled>TeePublic kit</button>
     <div class="kit"></div>
-    <button class="btn-sec panBtn" disabled>🎛 Vector panel</button>
-    <button class="btn-sec vecBtn" disabled>⬇ Vector SVG</button>
+    <button class="btn-sec panBtn" data-ic="sliders" disabled>Vector panel</button>
+    <button class="btn-sec vecBtn" data-ic="download" disabled>Vector SVG</button>
     <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
     <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
-    <button class="btn-sec wide metaBtn" disabled>📝 Write listing</button>
+    <button class="btn-sec wide metaBtn" data-ic="file" disabled>Write listing</button>
     <div class="meta"></div>`;
   return d;
 }
@@ -628,8 +628,8 @@ function resetAfterPictureChange(slot){
   slot._ed = null;
   slot.querySelectorAll('.upBtn').forEach(b => b.hidden = false);
   const kit = slot.querySelector('.kit'); kit.classList.remove('show'); kit.innerHTML = '';
-  slot.querySelector('.kitBtn').textContent = '🚀 TeePublic kit';
-  slot.querySelector('.txtBtn').textContent = '✏️ Add text';
+  slot.querySelector('.kitBtn').textContent = 'TeePublic kit';
+  slot.querySelector('.txtBtn').textContent = 'Add text';
   slot.querySelector('.aiUndo').hidden = !(slot._hist && slot._hist.length);
 }
 

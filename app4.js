@@ -7,7 +7,7 @@
   const THEME_KEY = 'pf_theme';
   function applyTheme(t){
     document.documentElement.dataset.theme = t;
-    const b = q('#themeBtn'); if(b) b.textContent = t === 'dark' ? '☀️' : '🌙';
+    const b = q('#themeBtn'); if(b) b.dataset.ic = t === 'dark' ? 'sun' : 'moon';
     const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = t === 'dark' ? '#0E0D22' : '#F2F3F7';
   }
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
@@ -188,7 +188,7 @@
     libUrls.forEach(u => URL.revokeObjectURL(u)); libUrls = [];
     all.sort((a, b) => b.ts - a.ts);
     const shown = libFav ? all.filter(r => r.fav) : all;
-    libCount.textContent = `${all.length} saved · ${all.filter(r => r.fav).length} ⭐`;
+    libCount.textContent = `${all.length} saved · ${all.filter(r => r.fav).length} favorites`;
     libGrid.innerHTML = '';
     libEmpty.hidden = shown.length > 0;
     libEmpty.querySelector('strong').textContent = libFav ? 'No favorites yet' : 'Library is empty';
@@ -199,13 +199,13 @@
       d.innerHTML = `<div class="img-box${rec.dark ? ' dark' : ''}"><img alt="Saved design"></div>
         <p class="lib-meta"></p>
         <button class="btn-sec" data-a="fav"></button>
-        <button class="btn-sec" data-a="mk">👕 Mockup</button>
-        <button class="btn-sec btn-main" data-a="dl">⬇ PNG</button>
-        <button class="btn-sec" data-a="del">🗑 Delete</button>`;
+        <button class="btn-sec" data-a="mk" data-ic="shirt">Mockup</button>
+        <button class="btn-sec btn-main" data-a="dl" data-ic="download">PNG</button>
+        <button class="btn-sec" data-a="del" data-ic="trash">Delete</button>`;
       d.querySelector('img').src = url;
       d.querySelector('.lib-meta').textContent = (rec.idea || 'Design').slice(0, 70);
       const favB = d.querySelector('[data-a=fav]');
-      favB.textContent = rec.fav ? '⭐ Favorite' : '☆ Favorite';
+      favB.textContent = 'Favorite'; favB.dataset.ic = rec.fav ? 'star-fill' : 'star';
       favB.onclick = async () => {
         await run('readwrite', s => { const r = s.get(rec.id); r.onsuccess = () => { const v = r.result; if(v){ v.fav = v.fav ? 0 : 1; s.put(v); } }; return r; });
         renderLib();
