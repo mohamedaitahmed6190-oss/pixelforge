@@ -18,14 +18,14 @@
     --display:'Archivo','Arial Black',system-ui,sans-serif;
     --paper:#E6E8F7; --surface:#FFFFFF; --surface-2:#F1F2FC; --ink:#16143A; --muted:#4B4D72;
     --line:#C3C6E2; --field:#9498C6; --ring:rgba(45,59,255,.20); --hard:4px 4px 0 var(--ink); --accent:#2D3BFF; --accent-dark:#1F2BD1; --orange:#FF4B1F; --on-orange:#16143A;
-    --danger:#C62828; --blend:multiply; --dot:rgba(22,20,58,.16);
+    --orange-text:#E03A0E; --danger:#C62828; --blend:multiply; --dot:rgba(22,20,58,.16);
     --radius-lg:14px; --radius:8px;
   }
   :root[data-theme="dark"]{
     color-scheme:dark;
     --paper:#0E0D22; --surface:#17163A; --surface-2:#1D1C46; --ink:#EEEDFF; --muted:#A5A3CC;
     --line:#2E2D62; --field:#3F3E80; --ring:rgba(127,137,255,.28); --hard:none; --accent:#7F89FF; --accent-dark:#6A75F5; --orange:#FF6B3D; --on-orange:#16143A;
-    --danger:#FF7B7B; --blend:screen; --dot:rgba(238,237,255,.16);
+    --orange-text:#FF6B3D; --danger:#FF7B7B; --blend:screen; --dot:rgba(238,237,255,.16);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5}
@@ -36,10 +36,11 @@
   .bar{background:var(--paper);color:var(--ink);border-bottom:2px solid var(--ink);position:sticky;top:0;z-index:40}
   .bar-in{max-width:1200px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
   .bar-r{display:flex;align-items:center;gap:10px}
-  .logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-stretch:125%;font-weight:900;font-size:22px;letter-spacing:-.02em;line-height:1}
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-stretch:112%;font-weight:800;font-size:22px;letter-spacing:0;line-height:1}
   .reg{width:30px;height:30px;color:var(--ink);flex:none}
-  .wm{position:relative;display:inline-block;color:var(--orange)}
-  .wm::after{content:attr(data-t);position:absolute;left:2px;top:1.5px;color:var(--accent);mix-blend-mode:var(--blend);pointer-events:none}
+  .wm{display:inline-block;white-space:nowrap}
+  .wm .w1{color:var(--ink)}
+  .wm .w2{color:var(--orange-text)}
   .bar small{color:var(--muted);font-size:13px}
   .bar small.usage{white-space:nowrap;position:relative;z-index:0;overflow:hidden;cursor:pointer;border:1.5px solid var(--ink);border-radius:999px;padding:3px 12px;color:var(--ink);font-weight:600}
   .bar small.usage::before{content:'';position:absolute;inset:0;width:calc(var(--pct,0) * 1%);background:var(--orange);opacity:.42;z-index:-1;transition:width .4s}
@@ -228,7 +229,7 @@
 
 <header class="bar">
   <div class="bar-in">
-    <div class="logo"><svg class="reg" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 1v30M1 16h30" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="3.5" fill="var(--orange)"/></svg><span class="wm" data-t="PixelForge">PixelForge</span></div>
+    <div class="logo"><svg class="reg" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 1v30M1 16h30" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="3.5" fill="var(--orange)"/></svg><span class="wm"><span class="w1">Pixel</span><span class="w2">Forge</span></span></div>
     <div class="bar-r">
       <small id="usage" class="usage" title="Images generated (UTC day). Tap to correct today's count">Today 0/150</small>
       <button id="themeBtn" class="icon-btn" type="button" aria-label="Toggle dark mode">🌙</button>
@@ -590,9 +591,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=11"></script>
-<script src="/app2.js?v=11"></script>
-<script src="/app3.js?v=11"></script>
+<script src="/app1.js?v=12"></script>
+<script src="/app2.js?v=12"></script>
+<script src="/app3.js?v=12"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -866,7 +867,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=11"></script>
+<script src="/app4.js?v=12"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
