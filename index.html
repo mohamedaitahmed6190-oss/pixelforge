@@ -58,7 +58,11 @@
   .panel{background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--hard);border-radius:var(--radius-lg);padding:20px}
   .side{min-width:0}
   .tool-title,.main h2,.ed-head h3{color:var(--orange-text)}
-  @media(min-width:901px){.layout[data-panel="closed"] .panel{display:none}.layout[data-panel="closed"]{grid-template-columns:260px 1fr}}
+  @media(min-width:901px){.layout[data-panel="closed"] .panel{display:none}.layout[data-panel="closed"]{grid-template-columns:260px 1fr;row-gap:18px}
+    .layout[data-panel="closed"] .side,.layout[data-panel="closed"] .main{display:contents}
+    .layout[data-panel="closed"] .side>.tabs-seg{grid-column:1;grid-row:1;margin:0}
+    .layout[data-panel="closed"] .main>.tabs-seg{grid-column:2;grid-row:1;margin:0}
+    .layout[data-panel="closed"] .main>.pane{grid-column:1/-1;grid-row:2}}
   @media(min-width:901px){.genwrap{position:sticky;bottom:0;z-index:5;background:var(--surface);padding:12px 0 6px;margin-top:10px;border-top:1px solid var(--line)}}
 
   /* tabs: desktop = two small switchers, mobile = bottom nav */
@@ -633,9 +637,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=19"></script>
-<script src="/app2.js?v=19"></script>
-<script src="/app3.js?v=19"></script>
+<script src="/app1.js?v=20"></script>
+<script src="/app2.js?v=20"></script>
+<script src="/app3.js?v=20"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -909,7 +913,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=19"></script>
+<script src="/app4.js?v=20"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
