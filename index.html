@@ -55,7 +55,7 @@
   .layout{display:grid;grid-template-columns:360px 1fr;gap:24px;margin-top:22px;align-items:start}
   .panel{background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--hard);border-radius:var(--radius-lg);padding:20px}
   .side{min-width:0}
-  .tool-title{color:var(--orange-text)}
+  .tool-title,.main h2,.ed-head h3{color:var(--orange-text)}
   @media(min-width:901px){.layout[data-panel="closed"] .panel{display:none}.layout[data-panel="closed"]{grid-template-columns:260px 1fr}}
   @media(min-width:901px){.genwrap{position:sticky;bottom:0;z-index:5;background:var(--surface);padding:12px 0 6px;margin-top:10px;border-top:1px solid var(--line)}}
 
@@ -631,9 +631,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=16"></script>
-<script src="/app2.js?v=16"></script>
-<script src="/app3.js?v=16"></script>
+<script src="/app1.js?v=17"></script>
+<script src="/app2.js?v=17"></script>
+<script src="/app3.js?v=17"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -907,7 +907,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=16"></script>
+<script src="/app4.js?v=17"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
