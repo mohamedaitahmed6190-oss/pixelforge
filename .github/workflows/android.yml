@@ -1,0 +1,28 @@
+name: Build Android APK
+on:
+  workflow_dispatch:
+  push:
+    paths: ['android/**', '.github/workflows/android.yml']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Build release APK
+        run: gradle -p android assembleRelease --no-daemon
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk PixelForge.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: PixelForge-apk, path: PixelForge.apk }
+      - name: Publish release (easy download from the phone)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: PixelForge APK ${{ github.run_number }}
+          files: PixelForge.apk
