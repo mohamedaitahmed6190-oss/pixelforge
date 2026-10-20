@@ -644,9 +644,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=22"></script>
-<script src="/app2.js?v=22"></script>
-<script src="/app3.js?v=22"></script>
+<script src="/app1.js?v=21"></script>
+<script src="/app2.js?v=21"></script>
+<script src="/app3.js?v=21"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -757,54 +757,35 @@
   // the whole upscale pipeline → finished canvas (also used by the other tools)
   async function runUpscale(img, say){
     const maxSide = Math.max(img.naturalWidth, img.naturalHeight);
-    // ONE AI pass (x2) only: two passes froze phones. Big images are already high-res → skip the AI.
-    const useAI = maxSide < 3000;
+    // small images need more help; large ones are already high-res
+    const passes = maxSide < 1500 ? 2 : maxSide < 3000 ? 1 : 0;
 
     let sharp;   // high-res canvas with correct transparency, before centering
-    const plain = (f) => { const s = scaleHQ(img, Math.round(img.naturalWidth * f), Math.round(img.naturalHeight * f)); return s; };
-    if(!useAI){
+    if(passes === 0){
       sharp = cv(img.naturalWidth, img.naturalHeight);
       sharp.getContext('2d').drawImage(img, 0, 0);          // keep as-is, alpha preserved
       say('Finishing…');
     } else {
-      try {
-        say('Loading AI…');
-        const up = await getUpscaler();
-        // keep the AI input small enough for a phone
-        const cap = 1100, k0 = Math.min(1, cap / maxSide);
-        const srcImg = k0 < 1 ? await loadImageEl(opaqueBled(scaleHQ(img, Math.round(img.naturalWidth * k0), Math.round(img.naturalHeight * k0))).toDataURL('image/png'))
-                              : await loadImageEl(opaqueBled(img).toDataURL('image/png'));
-        const ctl = new AbortController();
-        let lastTick = Date.now(), dead = false;
-        const wd = setInterval(() => { if(Date.now() - lastTick > 45000){ dead = true; ctl.abort(); } }, 2000);
-        say('Upscaling 0%');
-        let res;
-        try {
-          res = await Promise.race([
-            up.upscale(srcImg, {
-              patchSize: 64, padding: 6, awaitNextFrame: true, signal: ctl.signal,
-              progress: pr => { lastTick = Date.now(); say(`Upscaling ${Math.round(pr * 100)}%`); }
-            }),
-            new Promise((_, rej) => { const t = setInterval(() => { if(dead){ clearInterval(t); rej(new Error('AI_TIMEOUT')); } }, 1000); })
-          ]);
-        } finally { clearInterval(wd); }
-        const cur = await loadImageEl(res);
-        say('Finishing…');
-        sharp = cv(cur.naturalWidth, cur.naturalHeight);
-        const sc = sharp.getContext('2d'); sc.drawImage(cur, 0, 0);
-        // put the original transparency back (smoothly upscaled) — crisp cut, no halo
-        const mask = scaleHQ(img, sharp.width, sharp.height);
-        sc.globalCompositeOperation = 'destination-in';
-        sc.drawImage(mask, 0, 0);
-        sc.globalCompositeOperation = 'source-over';
-      } catch(e){
-        // the AI is too heavy for this device → standard high-quality upscaling instead of hanging
-        console.warn('AI upscale unavailable, using standard upscaling', e);
-        window.toast && toast('AI is too heavy for this device — used standard upscaling instead');
-        upscaler = null;
-        say('Finishing…');
-        sharp = plain(2);
+      const up = await getUpscaler();
+      // feed the AI an opaque (bled) copy so transparency never turns into a dark edge
+      let cur = await loadImageEl(opaqueBled(img).toDataURL('image/png'));
+      for(let p = 0; p < passes; p++){
+        const tag = passes > 1 ? `(pass ${p + 1}/${passes}) ` : '';
+        say(`Upscaling ${tag}0%`);
+        const src = await up.upscale(cur, {
+          patchSize: 64, padding: 6,
+          progress: pr => { say(`Upscaling ${tag}${Math.round(pr * 100)}%`); }
+        });
+        cur = await loadImageEl(src);
       }
+      say('Finishing…');
+      sharp = cv(cur.naturalWidth, cur.naturalHeight);
+      const sc = sharp.getContext('2d'); sc.drawImage(cur, 0, 0);
+      // put the original transparency back (smoothly upscaled) — crisp cut, no halo
+      const mask = scaleHQ(img, sharp.width, sharp.height);
+      sc.globalCompositeOperation = 'destination-in';
+      sc.drawImage(mask, 0, 0);
+      sc.globalCompositeOperation = 'source-over';
     }
 
     // Crop the empty transparent margins so the design is CENTERED (no side gap),
@@ -979,7 +960,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=22"></script>
+<script src="/app4.js?v=21"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
