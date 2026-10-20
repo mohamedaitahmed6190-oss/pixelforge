@@ -20,7 +20,7 @@ function renderUsage(){
   const u = loadUsage(), day = utcDay(), today = u.days[day] || 0;
   const month = Object.entries(u.days).filter(([d]) => d.slice(0, 7) === day.slice(0, 7)).reduce((a, [, n]) => a + n, 0);
   const el = $('#usage');
-  el.textContent = `Today ${today}/${DAILY_LIMIT} · Month ${month}`;
+  el.innerHTML = `Today ${today}/${DAILY_LIMIT}<span class="mo"> · Month ${month}</span>`;   // month hidden on small screens
   el.className = 'usage' + (today >= DAILY_LIMIT ? ' over' : today >= DAILY_LIMIT * 0.8 ? ' warn' : '');
 }
 $('#usage').onclick = () => {

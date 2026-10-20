@@ -8,7 +8,7 @@
   function applyTheme(t){
     document.documentElement.dataset.theme = t;
     const b = q('#themeBtn'); if(b) b.textContent = t === 'dark' ? '☀️' : '🌙';
-    const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = t === 'dark' ? '#0B0D10' : '#16181D';
+    const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = t === 'dark' ? '#0E0D22' : '#F2F3F7';
   }
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
   q('#themeBtn').onclick = () => {
@@ -63,6 +63,15 @@
   const wow = q('#wowBoost');
   try { if(localStorage.getItem('pf_wow') === '0') wow.checked = false; } catch(e){}
   wow.onchange = () => { try { localStorage.setItem('pf_wow', wow.checked ? '1' : '0'); } catch(e){} };
+
+  // usage chip fills up like an ink gauge (reads "Today 12/150")
+  const usageEl = q('#usage');
+  function syncUsage(){
+    const m = /(\d+)\s*\/\s*(\d+)/.exec(usageEl.textContent);
+    if(m) usageEl.style.setProperty('--pct', Math.min(100, Math.round(+m[1] / +m[2] * 100)));
+  }
+  new MutationObserver(syncUsage).observe(usageEl, { childList:true, characterData:true, subtree:true });
+  syncUsage();
 
   // the old "This session" strip is replaced by the Library
   window.renderHistory = function(){};
