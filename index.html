@@ -58,9 +58,6 @@
   .layout{display:grid;grid-template-columns:360px 1fr;gap:24px;margin-top:22px;align-items:start}
   .panel{background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--hard);border-radius:var(--radius-lg);padding:20px}
   .side{min-width:0}
-  .opts{margin:12px 0 0;padding:10px 12px;border:1px dashed var(--field);border-radius:10px;background:var(--surface-2)}
-  .opts-t{font-size:12.5px;font-weight:700;color:var(--orange-text);margin-bottom:6px}
-  .opts .check{margin:6px 0 0}
   .tool-title,.main h2,.ed-head h3{color:var(--orange-text)}
   @media(min-width:901px){.layout[data-panel="closed"] .panel{display:none}.layout[data-panel="closed"]{grid-template-columns:260px 1fr;row-gap:18px}
     .layout[data-panel="closed"] .side,.layout[data-panel="closed"] .main{display:contents}
@@ -451,7 +448,6 @@
         <input type="file" id="rsFile" accept="image/*" style="display:none">
         <button id="rsPick" class="btn-sec" type="button" style="margin-top:0" data-ic="ruler">Choose design</button>
         <img id="rsThumb" class="sim-thumb" alt="Selected design" hidden>
-        <div class="opts"><div class="opts-t">Before you download (optional)</div><label class="check"><input type="checkbox" id="rsRb"> <span><strong>Remove background</strong> first</span></label><label class="check"><input type="checkbox" id="rsUp"> <span><strong>Upscale</strong> to high resolution first (AI, sharper)</span></label></div>
         <button id="rsGo" class="btn-sec" type="button" disabled style="margin-top:12px" data-ic="download">Resize to 6000×6500 & download</button>
 
         <div class="divider"></div>
@@ -460,7 +456,6 @@
         <input type="file" id="upFile" accept="image/*" style="display:none">
         <button id="upPick" class="btn-sec" type="button" style="margin-top:0" data-ic="image">Choose design</button>
         <img id="upThumb" class="sim-thumb" alt="Selected design" hidden>
-        <div class="opts"><div class="opts-t">Before you download (optional)</div><label class="check"><input type="checkbox" id="upRb"> <span><strong>Remove background</strong> first</span></label></div>
         <button id="upGo" class="btn-sec" type="button" disabled style="margin-top:12px" data-ic="upscale">Upscale to high res & download</button>
 
         <div class="divider"></div>
@@ -469,7 +464,6 @@
         <input type="file" id="rbFile" accept="image/*" style="display:none">
         <button id="rbPick" class="btn-sec" type="button" style="margin-top:0" data-ic="eraser">Choose design</button>
         <img id="rbThumb" class="sim-thumb" alt="Selected design" hidden>
-        <div class="opts"><div class="opts-t">After removing, also (optional)</div><label class="check"><input type="checkbox" id="rbRs"> <span><strong>Resize to 6000×6500</strong> (fit, centered)</span></label><label class="check"><input type="checkbox" id="rbUp"> <span><strong>Upscale</strong> to high resolution (AI, sharper, 6000×6500+)</span></label></div>
         <div class="field" style="margin-top:12px">
           <label for="rbTol">Strength: <span id="rbTolV">45</span> <span class="hint">(keeps more ← → removes more)</span></label>
           <input id="rbTol" type="range" min="10" max="120" value="45">
@@ -644,9 +638,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=21"></script>
-<script src="/app2.js?v=21"></script>
-<script src="/app3.js?v=21"></script>
+<script src="/app1.js?v=20"></script>
+<script src="/app2.js?v=20"></script>
+<script src="/app3.js?v=20"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -671,37 +665,23 @@
     file.value = '';
   };
 
-  // fit the picture into 6000×6500, centered, no distortion; alpha kept
-  function resizeTo(src){
-    const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
-    const c = document.createElement('canvas'); c.width = RS_W; c.height = RS_H;
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const k = Math.min(RS_W / sw, RS_H / sh);
-    const w = sw * k, h = sh * k;
-    ctx.drawImage(src, (RS_W - w) / 2, (RS_H - h) / 2, w, h);
-    return c;
-  }
-  window.pfResize = resizeTo;
-
   go.onclick = async () => {
     if(!imgUrl) return;
     const old = go.textContent;
-    const say = t => { go.innerHTML = '<span class="spin"></span> ' + t; };
-    go.disabled = true; say('Resizing…');
+    go.disabled = true; go.innerHTML = '<span class="spin"></span> Resizing…';
     try {
-      let img = await loadImageEl(imgUrl), tag = '-6000x6500';
-      if(document.getElementById('rsRb').checked){
-        say('Removing background…'); await new Promise(r => setTimeout(r, 20));
-        img = await window.pfCanvasToImg(window.pfRemoveBg(img, window.pfTol())); tag = '-no-bg' + tag;
-      }
-      let c;
-      if(document.getElementById('rsUp').checked){ c = await window.pfUpscale(img, say); tag = tag.replace('-6000x6500', '') + `-${c.width}x${c.height}-HD`; }
-      else c = resizeTo(img);
+      const img = await loadImageEl(imgUrl);
+      const c = document.createElement('canvas');
+      c.width = RS_W; c.height = RS_H;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      const k = Math.min(RS_W / img.naturalWidth, RS_H / img.naturalHeight);   // fit, keep aspect ratio (no distortion)
+      const w = img.naturalWidth * k, h = img.naturalHeight * k;
+      ctx.drawImage(img, (RS_W - w) / 2, (RS_H - h) / 2, w, h);                 // centered, unchanged
       await new Promise(res => c.toBlob(b => {
         if(!b){ toast('Resize failed — try again', true); return res(); }
-        saveBlob(b, `${imgName}${tag}.png`);
-        toast(`Saved at ${c.width}×${c.height} ✓`);
+        saveBlob(b, `${imgName}-6000x6500.png`);
+        toast('Saved at 6000×6500 ✓');
         res();
       }, 'image/png'));
     } catch(e){
@@ -754,64 +734,52 @@
     return c;
   }
 
-  // the whole upscale pipeline → finished canvas (also used by the other tools)
-  async function runUpscale(img, say){
-    const maxSide = Math.max(img.naturalWidth, img.naturalHeight);
-    // small images need more help; large ones are already high-res
-    const passes = maxSide < 1500 ? 2 : maxSide < 3000 ? 1 : 0;
-
-    let sharp;   // high-res canvas with correct transparency, before centering
-    if(passes === 0){
-      sharp = cv(img.naturalWidth, img.naturalHeight);
-      sharp.getContext('2d').drawImage(img, 0, 0);          // keep as-is, alpha preserved
-      say('Finishing…');
-    } else {
-      const up = await getUpscaler();
-      // feed the AI an opaque (bled) copy so transparency never turns into a dark edge
-      let cur = await loadImageEl(opaqueBled(img).toDataURL('image/png'));
-      for(let p = 0; p < passes; p++){
-        const tag = passes > 1 ? `(pass ${p + 1}/${passes}) ` : '';
-        say(`Upscaling ${tag}0%`);
-        const src = await up.upscale(cur, {
-          patchSize: 64, padding: 6,
-          progress: pr => { say(`Upscaling ${tag}${Math.round(pr * 100)}%`); }
-        });
-        cur = await loadImageEl(src);
-      }
-      say('Finishing…');
-      sharp = cv(cur.naturalWidth, cur.naturalHeight);
-      const sc = sharp.getContext('2d'); sc.drawImage(cur, 0, 0);
-      // put the original transparency back (smoothly upscaled) — crisp cut, no halo
-      const mask = scaleHQ(img, sharp.width, sharp.height);
-      sc.globalCompositeOperation = 'destination-in';
-      sc.drawImage(mask, 0, 0);
-      sc.globalCompositeOperation = 'source-over';
-    }
-
-    // Crop the empty transparent margins so the design is CENTERED (no side gap),
-    // then scale to print size (fills 6000×6500 — TeePublic "all products" rule).
-    // fillExport + alphaBox come from app1.js.
-    // Crop the empty transparent margins so the design is CENTERED, then scale to print size.
-    return fillExport(sharp);
-  }
-  window.pfUpscale = runUpscale;
-
   go.onclick = async () => {
     if(!imgUrl) return;
     const old = go.textContent;
-    const say = t => { go.innerHTML = '<span class="spin"></span> ' + t; };
-    go.disabled = true; say('Loading AI…');
+    go.disabled = true; go.innerHTML = '<span class="spin"></span> Loading AI…';
     try {
-      let img = await loadImageEl(imgUrl), tag = '';
-      if(document.getElementById('upRb').checked){
-        say('Removing background…'); await new Promise(r => setTimeout(r, 20));
-        img = await window.pfCanvasToImg(window.pfRemoveBg(img, window.pfTol())); tag = '-no-bg';
+      const img = await loadImageEl(imgUrl);
+      const maxSide = Math.max(img.naturalWidth, img.naturalHeight);
+      // small images need more help; large ones are already high-res
+      const passes = maxSide < 1500 ? 2 : maxSide < 3000 ? 1 : 0;
+
+      let sharp;   // high-res canvas with correct transparency, before centering
+      if(passes === 0){
+        sharp = cv(img.naturalWidth, img.naturalHeight);
+        sharp.getContext('2d').drawImage(img, 0, 0);          // keep as-is, alpha preserved
+        go.innerHTML = '<span class="spin"></span> Finishing…';
+      } else {
+        const up = await getUpscaler();
+        // feed the AI an opaque (bled) copy so transparency never turns into a dark edge
+        let cur = await loadImageEl(opaqueBled(img).toDataURL('image/png'));
+        for(let p = 0; p < passes; p++){
+          const tag = passes > 1 ? `(pass ${p + 1}/${passes}) ` : '';
+          go.innerHTML = `<span class="spin"></span> Upscaling ${tag}0%`;
+          const src = await up.upscale(cur, {
+            patchSize: 64, padding: 6,
+            progress: pr => { go.innerHTML = `<span class="spin"></span> Upscaling ${tag}${Math.round(pr * 100)}%`; }
+          });
+          cur = await loadImageEl(src);
+        }
+        go.innerHTML = '<span class="spin"></span> Finishing…';
+        sharp = cv(cur.naturalWidth, cur.naturalHeight);
+        const sc = sharp.getContext('2d'); sc.drawImage(cur, 0, 0);
+        // put the original transparency back (smoothly upscaled) — crisp cut, no halo
+        const mask = scaleHQ(img, sharp.width, sharp.height);
+        sc.globalCompositeOperation = 'destination-in';
+        sc.drawImage(mask, 0, 0);
+        sc.globalCompositeOperation = 'source-over';
       }
-      const outCanvas = await runUpscale(img, say);
+
+      // Crop the empty transparent margins so the design is CENTERED (no side gap),
+      // then scale to print size (fills 6000×6500 — TeePublic "all products" rule).
+      // fillExport + alphaBox come from app1.js.
+      const outCanvas = fillExport(sharp);
 
       await new Promise(res => outCanvas.toBlob(b => {
         if(!b){ toast('Upscale failed — try again', true); return res(); }
-        saveBlob(b, `${imgName}${tag}-${outCanvas.width}x${outCanvas.height}-HD.png`);
+        saveBlob(b, `${imgName}-${outCanvas.width}x${outCanvas.height}-HD.png`);
         toast(`Saved at ${outCanvas.width}×${outCanvas.height}, centered ✓`);
         res();
       }, 'image/png'));
@@ -921,34 +889,20 @@
     return out;
   }
 
-  window.pfRemoveBg = removeBgCanvas;
-  window.pfTol = () => (tol ? +tol.value : 45);
-  window.pfCanvasToImg = c => new Promise((res, rej) => c.toBlob(b => b ? loadImageEl(URL.createObjectURL(b)).then(res, rej) : rej(new Error('canvas')), 'image/png'));
-  // Resize and Upscale are alternatives (upscale already ends at print size)
-  const rbRs = document.getElementById('rbRs'), rbUp = document.getElementById('rbUp');
-  rbRs.onchange = () => { if(rbRs.checked) rbUp.checked = false; };
-  rbUp.onchange = () => { if(rbUp.checked) rbRs.checked = false; };
-
   go.onclick = async () => {
     if(!imgUrl) return;
     const old = go.textContent;
-    const say = t => { go.innerHTML = '<span class="spin"></span> ' + t; };
-    go.disabled = true; say('Removing…');
+    go.disabled = true; go.innerHTML = '<span class="spin"></span> Removing…';
     try {
       const img = await loadImageEl(imgUrl);
       await new Promise(r => setTimeout(r, 20));
-      let out = removeBgCanvas(img, +tol.value), tag = '-no-bg';
+      const out = removeBgCanvas(img, +tol.value);
       // show the result (on a checker so transparency is visible)
       thumb.src = out.toDataURL('image/png'); thumb.classList.add('checker');
-      if(rbUp.checked){
-        out = await window.pfUpscale(await window.pfCanvasToImg(out), say); tag += `-${out.width}x${out.height}-HD`;
-      } else if(rbRs.checked){
-        out = window.pfResize(out); tag += '-6000x6500';
-      }
       await new Promise(res => out.toBlob(b => {
         if(!b){ toast('Remove failed — try again', true); return res(); }
-        saveBlob(b, `${imgName}${tag}.png`);
-        toast(tag === '-no-bg' ? 'Background removed ✓' : `Saved at ${out.width}×${out.height} ✓`);
+        saveBlob(b, `${imgName}-no-bg.png`);
+        toast('Background removed ✓');
         res();
       }, 'image/png'));
     } catch(e){
@@ -960,7 +914,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=21"></script>
+<script src="/app4.js?v=20"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
