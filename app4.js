@@ -17,6 +17,9 @@
     try { localStorage.setItem(THEME_KEY, t); } catch(e){}
   };
 
+  // header: no divider line; a soft shadow appears only once the page is scrolled
+  (function(){ const bar = document.querySelector('.bar'); if(!bar) return; const f = () => bar.classList.toggle('scrolled', window.scrollY > 4); window.addEventListener('scroll', f, { passive:true }); f(); })();
+
   /* ---------- tabs (Create / Results / Library / Tools) ---------- */
   const layout = q('.layout');
   const tabState = { left:'create', right:'results', mobile:'create', open:false };
