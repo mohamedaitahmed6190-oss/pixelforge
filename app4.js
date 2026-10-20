@@ -62,6 +62,24 @@
   new MutationObserver(updateBadge).observe(q('#results'), { childList:true });
   updateBadge();
 
+
+  /* ---------- IP guard: ask before generating protected names ---------- */
+  (function(){
+    const gen = q('#genBtn'), orig = gen.onclick;
+    gen.onclick = async function(e){
+      if(generating) return;
+      const ok = await window.ipConfirm((q('#idea').value || '') + ' ' + (q('#exactText').value || ''));
+      if(!ok){ tabState.open = true; setTab('create'); q('#idea').focus(); return; }
+      return orig.call(this, e);
+    };
+    const origEdit = window.runAiEdit;
+    if(origEdit) window.runAiEdit = async function(slot){
+      const t = slot.querySelector('.aiText'), ok = await window.ipConfirm(t ? t.value : '');
+      if(!ok) return;
+      return origEdit.call(this, slot);
+    };
+  })();
+
   /* ---------- number of designs per click (2 or 4) ---------- */
   const gc = q('#genCount');
   try { const v = localStorage.getItem('pf_gen_count'); if(v === '2' || v === '4') gc.value = v; } catch(e){}
