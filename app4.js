@@ -355,3 +355,51 @@
     } catch(e){ console.warn(e); toast('Could not load this design', true); }
   };
 })();
+
+/* ---------- Plan ahead card + Collection mode ---------- */
+(function(){
+  const box = document.getElementById('planBox');
+  if(box && window.SEASON){
+    SEASON.mount(box, name => {
+      const i = NICHES.findIndex(n => n.name === name);
+      if(i < 0) return;
+      nicheSel.value = String(i); fillIdeas();
+      window.setTab && setTab('create');
+      toast('Niche set to ' + name);
+    });
+    box.hidden = false;
+    box.insertAdjacentHTML('afterbegin', '<div class="plan-t">Plan ahead</div>');
+  }
+  const colN = document.getElementById('colN'), note = document.getElementById('colNote'), btn = document.getElementById('colBtn');
+  if(!btn) return;
+  const left = () => Math.max(0, DAILY_LIMIT - todayCount());
+  const upd = () => { if(note) note.textContent = 'Uses ' + colN.value + ' of your ' + left() + ' images left today.'; };
+  colN.onchange = upd; nicheSel.addEventListener('change', upd); upd();
+  const shuffle = a => { a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  let running = false;
+  btn.onclick = async () => {
+    if(running || generating) return;
+    const want = Math.min(+colN.value, left());
+    if(want < 1){ toast('Daily limit reached — come back tomorrow', true); return; }
+    const pool = shuffle(customList().concat(builtinList()));
+    if(!pool.length){ toast('This niche has no ideas yet — pick another niche', true); return; }
+    const keep = [$('#idea').value, $('#exactText').value];
+    running = true; btn.disabled = true; window.__pfStop = false; window.__pfCountOverride = 1;
+    let made = 0;
+    for(let i = 0; made < want && !window.__pfStop && todayCount() < DAILY_LIMIT; i++){
+      const [d, t] = pool[i % pool.length];
+      $('#idea').value = d; $('#exactText').value = t;
+      btn.textContent = 'Drawing ' + (made + 1) + ' of ' + want + '…';
+      const before = document.querySelectorAll('#results .card').length;
+      $('#genBtn').click();
+      await wait(50);
+      while(generating) await wait(300);
+      if(document.querySelectorAll('#results .card').length > before) made++;
+      else if(i >= pool.length * 2) break;   // nothing new (IP guard cancelled / failed) — don't loop forever
+    }
+    window.__pfCountOverride = 0; running = false; btn.disabled = false; btn.textContent = 'Build collection';
+    $('#idea').value = keep[0]; $('#exactText').value = keep[1]; upd();
+    toast(window.__pfStop ? 'Stopped' : made + ' designs added to your results');
+  };
+})();

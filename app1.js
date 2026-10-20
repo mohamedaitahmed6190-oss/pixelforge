@@ -270,6 +270,7 @@ const NICHES = [
     ['pastel art-deco hotel with neon sign and palm trees','Sunset Strip'],
     ['sports car silhouette with grid horizon and big sun','Midnight Cruiser'] ]}
 ];
+if(window.SEASON) SEASON.extend(NICHES);
 
 /* ---------- niche & idea selects (+ your own saved ideas) ---------- */
 const CUSTOM_KEY = 'pf_custom_ideas';
@@ -441,7 +442,7 @@ let generating = false, total = 0;
 const history = [];
 
 const GEN_KEY = 'pf_gen_count';
-function genCount(){ const s = $('#genCount'); return s && +s.value === 4 ? 4 : 2; }
+function genCount(){ if(window.__pfCountOverride) return window.__pfCountOverride; const s = $('#genCount'); return s && +s.value === 4 ? 4 : 2; }
 function genLabel(){ return `Generate ${genCount()} designs`; }
 
 // builds one result card (empty, with spinner); keeps the prompt so it can be re-rolled later

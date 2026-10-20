@@ -112,6 +112,17 @@
   select,input[type=text]{width:100%;border:1.5px solid var(--field);background:var(--surface);color:var(--ink);border-radius:var(--radius);padding:11px 12px;font-size:14px;outline:none;transition:border-color .15s}
   select:focus,input:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px var(--ring)}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .plan{border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 14px;background:var(--surface)}
+  .plan-t{font-weight:700;font-size:13px;color:var(--orange-text);margin:0 0 6px}
+  .plan-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+  .plan-row:first-of-type{border-top:0}
+  .plan-row .hint{font-size:12px;color:var(--muted)}
+  .plan-b{flex:none;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .plan-b.plan-now{background:var(--orange);border-color:var(--orange);color:var(--on-orange)}
+  .col{border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px}
+  .col summary{cursor:pointer;font-weight:700;font-size:13.5px}
+  .col .row2{margin-top:10px;align-items:end}
+  .col .btn-sec{margin-top:0}
   .divider{height:1.5px;background:var(--line);margin:18px 0}
   .gen{width:100%;border:2px solid var(--ink);border-radius:10px;background:var(--orange);color:var(--on-orange);font-family:var(--display);font-stretch:108%;font-weight:800;font-size:15px;padding:13px 8px;white-space:nowrap;cursor:pointer;box-shadow:3px 3px 0 var(--accent);transition:transform .08s,box-shadow .08s}
   .gen:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--accent)}
@@ -298,6 +309,7 @@
 
       <!-- CREATE -->
       <div id="paneCreate" class="pane">
+        <div id="planBox" class="plan" hidden></div>
         <div class="row2">
           <div class="field">
             <label for="product">Product</label>
@@ -392,6 +404,16 @@
         <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
 
         <p class="note" style="margin:0 0 8px">Keep text to 1–4 words for clean lettering. Always check spelling before uploading. Each design uses 1 of your daily images.</p>
+        <details class="col" id="colBox">
+          <summary>Make a collection</summary>
+          <p class="note" style="margin:6px 0 0">Draws one design for each idea in the chosen niche, then you pick the best. Uses your daily images.</p>
+          <div class="row2">
+            <div class="field" style="margin:0"><label for="colN">Designs</label><select id="colN"><option>6</option><option selected>10</option><option>20</option></select></div>
+            <button id="colBtn" class="btn-sec" type="button" data-ic="sparkles">Build collection</button>
+          </div>
+          <p class="note" id="colNote"></p>
+        </details>
+
         <div class="genwrap">
           <div class="gen-row">
             <select id="genCount" aria-label="Designs per click"><option value="2">2 designs</option><option value="4">4 designs</option></select>
@@ -649,9 +671,10 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=28"></script>
-<script src="/app2.js?v=28"></script>
-<script src="/app3.js?v=28"></script>
+<script src="/season.js?v=29"></script>
+<script src="/app1.js?v=29"></script>
+<script src="/app2.js?v=29"></script>
+<script src="/app3.js?v=29"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -1003,8 +1026,8 @@
 })();
 </script>
 
-<script src="/ipguard.js?v=28"></script>
-<script src="/app4.js?v=28"></script>
+<script src="/ipguard.js?v=29"></script>
+<script src="/app4.js?v=29"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
