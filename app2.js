@@ -345,7 +345,7 @@ async function downloadUpscaled(originalUrl, idx, btn, dark, halo){
     const img = await loadImageEl(originalUrl);
     btn.innerHTML = '<span class="spin"></span> Upscaling 0%';
     const src = await up.upscale(img, {
-      patchSize: 64, padding: 6,
+      patchSize: 64, padding: 6, awaitNextFrame: true,
       progress: p => { btn.innerHTML = `<span class="spin"></span> Upscaling ${Math.round(p*100)}%`; }
     });
     btn.innerHTML = '<span class="spin"></span> Finishing…';
