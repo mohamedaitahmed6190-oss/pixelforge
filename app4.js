@@ -19,14 +19,14 @@
 
   /* ---------- tabs (Create / Results / Library / Tools) ---------- */
   const layout = q('.layout');
-  const tabState = { left:'create', right:'results', mobile:'create' };
+  const tabState = { left:'create', right:'results', mobile:'create', open:false };
   function setTab(name){
     if(name === 'create' || name === 'tools') tabState.left = name; else tabState.right = name;
     tabState.mobile = name;
-    layout.dataset.left = tabState.left; layout.dataset.right = tabState.right; layout.dataset.mobile = tabState.mobile;
+    layout.dataset.left = tabState.left; layout.dataset.right = tabState.right; layout.dataset.mobile = tabState.mobile; layout.dataset.panel = tabState.open ? 'open' : 'closed';
     qa('[data-tab]').forEach(b => {
       const t = b.dataset.tab;
-      const on = b.classList.contains('nb') ? t === tabState.mobile : (t === tabState.left || t === tabState.right);
+      const on = b.classList.contains('nb') ? t === tabState.mobile : ((t === tabState.left && tabState.open) || t === tabState.right);
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
@@ -34,14 +34,21 @@
     if(window.matchMedia('(max-width:900px)').matches) window.scrollTo({ top:0 });
   }
   window.setTab = setTab;
-  qa('[data-tab]').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  qa('[data-tab]').forEach(b => b.addEventListener('click', () => {
+    const t = b.dataset.tab;
+    // desktop: the form/tools panel is hidden until Create or Tools is tapped; tapping the active one hides it again
+    if(!b.classList.contains('nb') && (t === 'create' || t === 'tools')){
+      tabState.open = !(tabState.open && tabState.left === t);
+    }
+    setTab(t);
+  }));
   setTab('create');
 
   // show the results as soon as a generation starts
-  q('#genBtn').addEventListener('click', () => { setTab('results'); });
+  q('#genBtn').addEventListener('click', () => { tabState.open = false; setTab('results'); });
   // "Use" on a concept → go back to the form
   q('#concepts').addEventListener('click', e => {
-    if(e.target.closest('[data-use]')){ setTab('create'); setTimeout(() => q('#idea').scrollIntoView({ behavior:'smooth', block:'center' }), 60); }
+    if(e.target.closest('[data-use]')){ tabState.open = true; setTab('create'); setTimeout(() => q('#idea').scrollIntoView({ behavior:'smooth', block:'center' }), 60); }
   });
 
   // badge on the Results tab
