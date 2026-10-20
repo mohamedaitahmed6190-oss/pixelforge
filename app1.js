@@ -437,9 +437,48 @@ function buildPrompt(){
 let generating = false, total = 0;
 const history = [];
 
+const GEN_KEY = 'pf_gen_count';
+function genCount(){ const s = $('#genCount'); return s && +s.value === 4 ? 4 : 2; }
+function genLabel(){ return `Generate ${genCount()} designs`; }
+
+// builds one result card (empty, with spinner); keeps the prompt so it can be re-rolled later
+function makeCard(prompt, ideaVal, productLabel, styleLabel){
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.dataset.text = $('#exactText').value.trim();
+  d.dataset.dark = isDark() ? '1' : '';
+  d.dataset.universal = isUniversal() ? '1' : '';
+  d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
+  d._prompt = prompt; d._idea = ideaVal; d._prod = productLabel; d._style = styleLabel;
+  d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
+    <button class="btn-sec btn-main wide dlBtn" disabled>⬇ Download PNG</button>
+    <button class="btn-sec txtBtn" disabled>✏️ Add text</button>
+    <button class="btn-sec aiBtn" disabled>🪄 AI edit</button>
+    <div class="aiPanel">
+      <label>What to change? <span class="hint">(short, English)</span></label>
+      <input class="aiText" type="text" placeholder="e.g. change the dog to a pug">
+      <label>Change strength: <span class="aiStrVal">40</span>% <span class="hint">(low = keeps design)</span></label>
+      <input class="aiStr" type="range" min="15" max="75" value="40">
+      <button class="gen aiGo" type="button">Apply AI edit</button>
+      <button class="btn-sec aiUndo" type="button" hidden>↩ Undo last edit</button>
+    </div>
+    <button class="btn-sec mkBtn" disabled>👕 Mockup</button>
+    <button class="btn-sec rrBtn" disabled>🔄 Re-roll</button>
+    <button class="btn-sec wide kitBtn" disabled>🚀 TeePublic kit</button>
+    <div class="kit"></div>
+    <button class="btn-sec panBtn" disabled>🎛 Vector panel</button>
+    <button class="btn-sec vecBtn" disabled>⬇ Vector SVG</button>
+    <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
+    <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
+    <button class="btn-sec wide metaBtn" disabled>📝 Write listing</button>
+    <div class="meta"></div>`;
+  return d;
+}
+
 $('#genBtn').onclick = async () => {
   if(generating) return;
   if(todayCount() >= DAILY_LIMIT){ toast(`Daily limit (${DAILY_LIMIT}) reached — come back tomorrow`, true); return; }
+  const n = genCount();
   const prompt = buildPrompt();
   const ideaVal = $('#idea').value.trim();
   const productLabel = $('#product').selectedOptions[0].text;
@@ -450,45 +489,49 @@ $('#genBtn').onclick = async () => {
   $('#empty').hidden = true;
 
   const slots = [];
-  for(let i=0;i<2;i++){
-    const d = document.createElement('div');
-    d.className = 'card';
-    d.dataset.text = $('#exactText').value.trim();
-    d.dataset.dark = isDark() ? '1' : '';
-    d.dataset.universal = isUniversal() ? '1' : '';
-    d.dataset.niche = [$('#cNiche').value.trim(), nicheSel.value === 'mine' ? '' : nicheName()].filter(Boolean).join(', ');
-    d.innerHTML = `<div class="img-box"><span class="spin"></span></div>
-      <button class="btn-sec btn-kit kitBtn" disabled>🚀 TeePublic kit</button>
-      <div class="kit"></div>
-      <button class="btn-sec btn-ai aiBtn" disabled>🪄 AI edit</button>
-      <div class="aiPanel">
-        <label>What to change? <span class="hint">(short, English)</span></label>
-        <input class="aiText" type="text" placeholder="e.g. change the dog to a pug">
-        <label>Change strength: <span class="aiStrVal">40</span>% <span class="hint">(low = keeps design)</span></label>
-        <input class="aiStr" type="range" min="15" max="75" value="40">
-        <button class="gen aiGo" type="button">Apply AI edit</button>
-        <button class="btn-sec aiUndo" type="button" hidden>↩ Undo last edit</button>
-      </div>
-      <button class="btn-sec btn-text txtBtn" disabled>✏️ Add text</button>
-      <button class="btn-sec dlBtn" disabled>Download PNG</button>
-      <button class="btn-sec btn-vec panBtn" disabled>🎛 Vector panel</button>
-      <button class="btn-sec btn-vec vecBtn" disabled>⬇ Vector SVG</button>
-      <button class="btn-sec svgBtn" disabled>HD PNG (vectorized)</button>
-      <button class="btn-sec upBtn" disabled>AI upscale (HD)</button>
-      <button class="btn-sec metaBtn" disabled>Write listing</button>
-      <div class="meta"></div>`;
-    $('#results').prepend(d);
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<n;i++){
+    const d = makeCard(prompt, ideaVal, productLabel, styleLabel);
+    frag.appendChild(d);
     slots.push(d);
   }
+  $('#results').prepend(frag);   // same order as created: design 1 first
   const results = [];
   for(let i=0;i<slots.length;i++){
     results.push(await genOne(prompt, slots[i], i, ideaVal, productLabel, styleLabel));
   }
-  generating = false; btn.disabled = false; btn.textContent = 'Generate 2 designs';
+  generating = false; btn.disabled = false; btn.textContent = genLabel();
   const failed = results.filter(r => !r.ok);
   if(failed.some(r => r.limit)) toast('Daily limit reached — come back tomorrow', true);
   else if(failed.length) toast(failed.length + ' design(s) failed — try again', true);
 };
+
+// Re-roll: draw ONE card again with a fresh variation (the server ignores seeds, so a new variation text is what changes the picture)
+async function regenSlot(slot){
+  if(generating){ toast('Wait for the current generation to finish', true); return; }
+  if(todayCount() >= DAILY_LIMIT){ toast(`Daily limit (${DAILY_LIMIT}) reached — come back tomorrow`, true); return; }
+  generating = true;
+  const box = slot.querySelector('.img-box');
+  const prev = { html: box.innerHTML, dark: box.classList.contains('dark'), raw: slot._raw, base: slot._base, url: slot._url, hist: slot._hist, ed: slot._ed };
+  const enabled = [...slot.querySelectorAll('button')].filter(b => !b.disabled);
+  slot.querySelectorAll('button').forEach(b => b.disabled = true);
+  box.classList.remove('dark');
+  box.innerHTML = '<span class="spin"></span>';
+  const idx = 2 + Math.floor(Math.random() * 90);
+  let r;
+  try { r = await genOne(slot._prompt, slot, idx, slot._idea, slot._prod, slot._style); }
+  catch(e){ console.warn(e); r = { ok:false }; }
+  generating = false;
+  if(r && r.ok){
+    resetAfterPictureChange(slot);
+    toast('New variation ready ✓');
+  } else {
+    box.innerHTML = prev.html; box.classList.toggle('dark', prev.dark);
+    slot._raw = prev.raw; slot._base = prev.base; slot._url = prev.url; slot._hist = prev.hist; slot._ed = prev.ed;
+    enabled.forEach(b => b.disabled = false);
+    toast(r && r.limit ? 'Daily limit reached — come back tomorrow' : 'Re-roll failed — your design is unchanged', true);
+  }
+}
 
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
@@ -614,6 +657,12 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   const metaBtn = slot.querySelector('.metaBtn');
   metaBtn.disabled = false;
   metaBtn.onclick = () => loadMetadata(slot, ideaVal, productLabel, styleLabel);
+  const mkBtn = slot.querySelector('.mkBtn');
+  mkBtn.disabled = false;
+  mkBtn.onclick = () => openMockup(slot._url, slot.dataset.dark === '1');
+  const rrBtn = slot.querySelector('.rrBtn');
+  rrBtn.disabled = false;
+  rrBtn.onclick = () => regenSlot(slot);
 
   // AI edit
   const aiBtn = slot.querySelector('.aiBtn'), panel = slot.querySelector('.aiPanel');
@@ -627,6 +676,7 @@ async function finishSlot(url, box, dl, idx, prompt, slot, ideaVal, productLabel
   total++; $('#count').textContent = `${total} design${total>1?'s':''} this session`;
   history.unshift({ url: finalUrl, prompt });
   renderHistory();
+  if(window.libSave) libSave(slot);   // keep it in the Library (survives refresh)
   return { ok:true };
 }
 
@@ -660,6 +710,7 @@ async function runAiEdit(slot){
     await applyRaw(slot, URL.createObjectURL(blob));
     resetAfterPictureChange(slot);
     history.unshift({ url: slot._base, prompt:'edit' }); renderHistory();
+    if(window.libSave) libSave(slot);
     toast('Edited ✓ — tap Undo if you prefer the old one');
   } catch(e){
     console.warn(e);

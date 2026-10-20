@@ -7,15 +7,22 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#16181D">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('pf_theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Cinzel:wght@800&family=Creepster&family=Fredoka:wght@600&family=Great+Vibes&family=Lobster&family=Luckiest+Guy&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@800&family=Righteous&family=Rye&family=Satisfy&family=Shrikhand&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
 <style>
   :root{
-    --paper:#F2F3F6; --surface:#FFFFFF; --ink:#16181D; --muted:#5F6570;
-    --line:#E1E4EA; --accent:#2F4BFF; --accent-dark:#1E33C7;
+    color-scheme:light;
+    --paper:#F2F3F6; --surface:#FFFFFF; --surface-2:#FAFBFC; --ink:#16181D; --muted:#5F6570;
+    --line:#E1E4EA; --accent:#2F4BFF; --accent-dark:#1E33C7; --danger:#C62828; --bar:#16181D;
     --radius-lg:20px; --radius:12px;
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --paper:#0F1115; --surface:#181B21; --surface-2:#1E222A; --ink:#ECEEF2; --muted:#9AA1AD;
+    --line:#2B303A; --accent:#5468FF; --accent-dark:#4357E6; --danger:#FF6B6B; --bar:#0B0D10;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5}
@@ -23,125 +30,173 @@
   button,input,select{font:inherit;color:inherit}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-  .bar{background:var(--ink);color:#fff}
-  .bar-in{max-width:1200px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  .bar{background:var(--bar);color:#fff;position:sticky;top:0;z-index:40}
+  .bar-in{max-width:1200px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .bar-r{display:flex;align-items:center;gap:10px}
   .logo{display:flex;align-items:center;gap:10px;font-family:'Bricolage Grotesque';font-weight:800;font-size:19px}
   .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;font-size:13px}
   .bar small{color:#A9AEB8;font-size:13px}
   .bar small.usage{cursor:pointer;border:1px solid #3A3F4B;border-radius:999px;padding:3px 10px}
   .bar small.usage.warn{color:#FFD23F;border-color:#FFD23F}
   .bar small.usage.over{color:#FF6B6B;border-color:#FF6B6B}
+  .icon-btn{border:1px solid #3A3F4B;background:transparent;color:#fff;border-radius:999px;width:34px;height:34px;cursor:pointer;font-size:15px;line-height:1}
 
-  .wrap{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+  .wrap{max-width:1200px;margin:0 auto;padding:24px 20px 50px}
   .intro h1{font-size:clamp(28px,4vw,40px);font-weight:800}
   .intro p{color:var(--muted);margin:6px 0 0;max-width:60ch}
 
-  .layout{display:grid;grid-template-columns:360px 1fr;gap:24px;margin-top:24px;align-items:start}
-  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  .layout{display:grid;grid-template-columns:360px 1fr;gap:24px;margin-top:22px;align-items:start}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px;position:sticky;top:76px;max-height:calc(100vh - 92px);overflow-y:auto}
 
-  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px;position:sticky;top:16px}
-  @media(max-width:900px){.panel{position:static}}
+  /* tabs: desktop = two small switchers, mobile = bottom nav */
+  .pane{display:none}
+  .tabs-seg{display:flex;gap:6px;margin:0 0 16px}
+  .sb{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
+  .sb.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .nav{display:none}
+  @media(min-width:901px){
+    .layout[data-left="create"] #paneCreate,
+    .layout[data-left="tools"] #paneTools,
+    .layout[data-right="results"] #paneResults,
+    .layout[data-right="library"] #paneLibrary{display:block}
+  }
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr;margin-top:12px}
+    .layout[data-mobile="create"] #paneCreate,
+    .layout[data-mobile="tools"] #paneTools,
+    .layout[data-mobile="results"] #paneResults,
+    .layout[data-mobile="library"] #paneLibrary{display:block}
+    .layout[data-mobile="results"] .panel,.layout[data-mobile="library"] .panel,
+    .layout[data-mobile="create"] .main,.layout[data-mobile="tools"] .main{display:none}
+    .panel{position:static;max-height:none;overflow:visible;padding:16px}
+    .tabs-seg{display:none}
+    .intro{display:none}
+    .wrap{padding:14px 14px 30px}
+    body{padding-bottom:76px}
+    .nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+    .nb{position:relative;border:0;background:transparent;border-radius:12px;padding:6px 2px;font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+    .nb span{font-size:19px;line-height:1}
+    .nb.on{color:var(--accent);background:var(--surface-2)}
+    .nb b{position:absolute;top:2px;left:calc(50% + 8px);background:var(--accent);color:#fff;border-radius:999px;font-size:10px;line-height:1;padding:3px 5px}
+    .toast{bottom:90px!important}
+    .genwrap{position:sticky;bottom:72px;z-index:5;background:var(--surface);padding:10px 0 8px;border-top:1px solid var(--line);margin-top:8px}
+  }
+
   .field{margin-bottom:14px}
   .field label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
   .field .hint{font-weight:400;color:var(--muted)}
-  select,input[type=text]{width:100%;border:1px solid var(--line);background:#FAFBFC;border-radius:var(--radius);padding:11px 12px;font-size:14px;outline:none;transition:border-color .15s}
-  select:focus,input:focus{border-color:var(--accent);background:#fff}
+  select,input[type=text]{width:100%;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:var(--radius);padding:11px 12px;font-size:14px;outline:none;transition:border-color .15s}
+  select:focus,input:focus{border-color:var(--accent);background:var(--surface)}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .divider{height:1px;background:var(--line);margin:18px 0}
   .gen{width:100%;border:0;border-radius:14px;background:var(--accent);color:#fff;font-weight:600;font-size:16px;padding:14px;cursor:pointer;transition:background .15s}
   .gen:hover{background:var(--accent-dark)}
   .gen:disabled{opacity:.55;cursor:not-allowed}
+  .gen-row{display:flex;gap:8px}
+  .gen-row select{width:112px;flex:none;border-radius:14px}
+  .gen-row .gen{flex:1}
   .note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
 
-  .out-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  .out-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
   .out-head h2{font-size:22px}
   .out-head span{color:var(--muted);font-size:13px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  .out-head .grow{flex:1}
+  .out-head .btn-sec{width:auto;margin:0;padding:7px 12px}
+  .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
+  .chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
   .empty{border:2px dashed var(--line);border-radius:var(--radius-lg);padding:48px 20px;text-align:center;color:var(--muted)}
   .empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
 
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px}
-  .img-box{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;overflow:hidden;
-    background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
+  /* result cards: image on top, buttons in a tidy 2-column grid */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start}
+  .card > .img-box,.card > .wide,.card > .kit,.card > .aiPanel,.card > .meta,.card > .lib-meta{grid-column:1/-1}
+  .card .btn-sec{margin:0;padding:9px 6px;font-size:13px;line-height:1.25}
+  .img-box{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;overflow:hidden;margin-bottom:2px;
+    background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px;color:#16181D}
   .img-box img{width:100%;height:100%;object-fit:contain}
   .img-box.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
   .status{font-size:12.5px;color:var(--muted);text-align:center;padding:0 12px}
-  .status.err{color:#C62828;font-weight:600}
-  .btn-sec{width:100%;margin-top:8px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;font-size:14px;cursor:pointer}
+  .img-box .status{color:#5F6570}
+  .status.err{color:var(--danger);font-weight:600}
+  .img-box .status.err{color:#C62828}
+  .btn-sec{width:100%;margin-top:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:9px;font-weight:600;font-size:14px;cursor:pointer}
   .btn-sec:hover:not(:disabled){border-color:var(--ink)}
   .btn-sec:disabled{opacity:.45;cursor:not-allowed}
-
-  .btn-kit{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .btn-kit:hover:not(:disabled){background:#000}
-  .kit{display:none;margin-top:8px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:#FAFBFC}
+  .btn-main{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .btn-main:hover:not(:disabled){opacity:.9}
+  .kit{display:none;margin-top:2px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:var(--surface-2)}
   .kit.show{display:block}
   .kit p{margin:0 0 4px;font-size:12.5px;color:var(--muted)}
   .kit p strong{color:var(--ink)}
   a.btn-sec{display:block;text-align:center;text-decoration:none;color:var(--ink)}
-  .meta{font-size:12.5px;margin-top:10px;display:none}
+  .meta{font-size:12.5px;margin-top:4px;display:none}
   .meta.show{display:block}
   .meta .t{font-weight:600;font-size:13.5px}
   .meta p{margin:6px 0;color:var(--muted)}
   .tags{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
   .tag{background:var(--paper);border-radius:6px;padding:3px 7px;font-size:12px}
   .copy-row{display:flex;gap:6px;align-items:flex-start;justify-content:space-between}
-  .mini{border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 8px;font-size:11.5px;cursor:pointer;flex-shrink:0}
+  .mini{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:3px 8px;font-size:11.5px;cursor:pointer;flex-shrink:0}
+  .lib-meta{margin:2px 2px 4px;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-  .history{margin-top:32px}
-  .history h3{font-size:17px;margin-bottom:10px}
-  .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}
-  .hgrid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer}
-
-  .spin{width:20px;height:20px;border:2.5px solid #D6DAE2;border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;display:inline-block;vertical-align:-5px}
+  .spin{width:20px;height:20px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;display:inline-block;vertical-align:-5px}
   .gen .spin{border-color:rgba(255,255,255,.35);border-top-color:#fff;margin-right:6px}
   @keyframes s{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
 
   .check{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:-4px 0 12px;cursor:pointer}
   .check input{margin-top:3px;accent-color:var(--accent)}
-  .btn-text{border-color:var(--accent);color:var(--accent)}
-  .btn-ai{border-color:#8A2BE2;color:#8A2BE2}
-  .btn-vec{border-color:#0F9D58;color:#0F9D58}
-  .aiPanel{display:none;margin-top:8px;padding:10px;border:1px dashed #8A2BE2;border-radius:12px;background:#FAF6FF}
+  .aiPanel{display:none;margin-top:2px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:var(--surface-2)}
   .aiPanel.show{display:block}
   .aiPanel label{display:block;font-weight:600;font-size:12.5px;margin:0 0 4px}
   .aiPanel .hint{font-weight:400;color:var(--muted)}
   .aiPanel input[type=text]{margin-bottom:8px}
   .aiPanel input[type=range]{margin-bottom:6px}
+  .aiPanel .btn-sec{margin-top:8px}
   .ed{position:fixed;inset:0;background:rgba(10,12,16,.6);z-index:60;overflow-y:auto;padding:14px}
   .ed[hidden]{display:none}
-  .ed-box{max-width:520px;margin:0 auto;background:#fff;border-radius:20px;padding:16px}
+  .ed-box{max-width:520px;margin:0 auto;background:var(--surface);color:var(--ink);border-radius:20px;padding:16px}
   .ed-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .ed-head h3{font-size:19px}
   .ed canvas{width:100%;height:auto;display:block;border-radius:12px;
     background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .ed canvas.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
+  .ed #mkCanvas{background:#E4E7ED}
   .seg,.seg2{display:flex;gap:6px;margin:12px 0}
-  .seg button,.seg2 button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
-  .seg button.on,.seg2 button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .seg button,.seg2 button{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px;font-weight:600;cursor:pointer}
+  .seg button.on,.seg2 button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
   input[type=range]{width:100%;accent-color:var(--accent)}
-  input[type=color]{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:4px;cursor:pointer}
+  input[type=color]{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:4px;cursor:pointer}
   .cpick{display:flex;gap:8px}
   .cpick input[type=color]{width:52px;flex:none}
   .cpick input[type=text]{flex:1;font-family:ui-monospace,monospace;text-transform:uppercase}
   .swatches{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
   .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:70}
-  .toast.err{background:#C62828}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;font-size:14px;z-index:70;max-width:90vw;text-align:center}
+  .toast.err{background:#C62828;color:#fff}
   footer{text-align:center;color:var(--muted);font-size:13px;padding:0 20px 30px}
-  footer a{color:var(--accent)}
+
+  /* tools */
+  .tool-title{font-size:17px;margin:0}
+  .concept{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px;background:var(--surface-2)}
+  .concept .ct{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px}
+  .concept p{margin:4px 0;font-size:13px;color:var(--muted)}
+  .concept p strong{color:var(--ink);font-weight:600}
+  .concept .row{display:flex;gap:6px;margin-top:8px}
+  .concept .row .btn-sec{margin-top:0}
 
   /* similar image + vector panel */
-  .sim-thumb{display:block;width:100%;max-height:200px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#FAFBFC;margin-top:8px}
+  .sim-thumb{display:block;width:100%;max-height:200px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);margin-top:8px}
   .sim-thumb[hidden]{display:none}
   .sim-thumb.checker{background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .vp-prev{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;
     background:repeating-conic-gradient(#ECEEF2 0% 25%,#fff 0% 50%) 50%/18px 18px}
   .vp-prev.dark{background:repeating-conic-gradient(#2A2D35 0% 25%,#1B1D22 0% 50%) 50%/18px 18px}
   .vp-prev img{width:100%;height:100%;object-fit:contain;display:block}
-  .vp-busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.65);font-weight:600}
+  .vp-busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.65);color:#16181D;font-weight:600}
   .vp-busy[hidden]{display:none}
-  .vp-adv{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px;background:#FAFBFC}
+  .vp-adv{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px;background:var(--surface-2)}
   .vp-adv summary{font-weight:600;cursor:pointer;margin-bottom:10px}
   .vp-adv[open] summary{margin-bottom:14px}
   .vp-sub{font-weight:600;font-size:13px;margin:0 0 6px}
@@ -152,7 +207,10 @@
 <header class="bar">
   <div class="bar-in">
     <div class="logo"><span class="mark">pf</span>PixelForge</div>
-    <small id="usage" class="usage" title="Images generated (UTC day). Tap to correct today's count">Today 0/120</small>
+    <div class="bar-r">
+      <small id="usage" class="usage" title="Images generated (UTC day). Tap to correct today's count">Today 0/150</small>
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="Toggle dark mode">🌙</button>
+    </div>
   </div>
 </header>
 
@@ -162,203 +220,231 @@
     <p>Pick a niche, choose an idea, and generate print-ready transparent PNGs for your POD store.</p>
   </div>
 
-  <div class="layout">
+  <div class="layout" data-left="create" data-right="results" data-mobile="create">
     <aside class="panel">
-      <div class="row2">
+      <div class="tabs-seg"><button class="sb on" type="button" data-tab="create">✨ Create</button><button class="sb" type="button" data-tab="tools">🧰 Tools</button></div>
+
+      <!-- CREATE -->
+      <div id="paneCreate" class="pane">
+        <div class="row2">
+          <div class="field">
+            <label for="product">Product</label>
+            <select id="product">
+              <option value="t-shirt graphic, centered composition">T-shirt</option>
+              <option value="hoodie graphic, bold centered design">Hoodie</option>
+              <option value="mug wrap design, seamless horizontal composition">Mug wrap</option>
+              <option value="die-cut sticker design, thick white border">Sticker</option>
+              <option value="tote bag print design, minimalist composition">Tote bag</option>
+              <option value="phone case graphic, vertical composition">Phone case</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="style">Style</label>
+            <select id="style">
+              <optgroup label="Artistic (hand-made look)">
+                <option value="hand-drawn pen and ink illustration, expressive confident linework, visible sketch lines, cross-hatching shading, artist sketchbook feel, not cartoon, not clipart">Ink sketch</option>
+                <option value="expressive oil painting, thick impasto brush strokes, rich painterly texture, gallery artwork, not cartoon, not clipart">Oil painting</option>
+                <option value="gouache painting, visible opaque brush strokes, matte hand-painted texture, rich muted colors, not cartoon, not clipart">Gouache</option>
+                <option value="loose watercolor painting, wet-on-wet blooms, visible paper grain, delicate ink outlines, hand-painted, not cartoon, not clipart">Watercolor</option>
+                <option value="linocut block print, bold hand-carved lines, imperfect ink texture, artisan printmaking, 2 ink colors, not cartoon, not clipart">Linocut print</option>
+                <option value="ukiyo-e japanese woodblock print style, flowing hand-carved lines, traditional flat colors, subtle paper texture, not cartoon">Woodblock (ukiyo-e)</option>
+                <option value="charcoal and soft pastel drawing, smudged shading, expressive hand strokes, fine art drawing, not cartoon, not clipart">Charcoal & pastel</option>
+                <option value="dotwork stipple illustration, thousands of fine hand-inked dots, tattoo artist technique, high detail, not cartoon">Dotwork stipple</option>
+                <option value="vintage scientific naturalist illustration, fine engraving lines and stippling, hand-tinted watercolor, 19th century art, not cartoon">Vintage naturalist</option>
+                <option value="classic engraving illustration, fine crosshatching, intricate linework, not cartoon">Engraving</option>
+                <option value="risograph print illustration, grainy ink texture, 2-3 overlapping ink colors, slight misregistration, indie art print, not cartoon">Risograph</option>
+                <option value="american traditional tattoo flash art, bold hand-inked black outlines, limited vintage palette, tattoo artist style">Tattoo flash</option>
+                <option value="fine art digital painting, painterly brushwork, rich detail, not cartoon, not clipart">Fine art painterly</option>
+                <option value="surreal fine art illustration, dreamlike atmosphere, painterly detail, not cartoon">Surreal</option>
+              </optgroup>
+              <optgroup label="Works on light AND dark shirts">
+                <option data-universal="1" value="bold sticker style illustration that works on both white and black t-shirts, mid-tone saturated colors like orange, teal, red and yellow, very thick black outlines around every shape, no pure white areas, no large black areas, flat colors with simple shading">Universal sticker (any tee)</option>
+                <option data-universal="1" value="detailed watercolor clipart illustration in the style of premium autumn sublimation clipart, soft hand-painted watercolor textures, fine delicate details with individual fluffy fur strands, rich warm saturated colors like orange, rust, amber, honey and teal, soft realistic shading, cute and charming, no flat vector, no cartoon, no heavy black outlines, mid-tone colors that look good on both white and black t-shirts">Watercolor clipart (any tee)</option>
+              </optgroup>
+              <optgroup label="For dark shirts (black, red, purple…)">
+                <option data-dark="1" value="bold screen print illustration made for dark t-shirts, bright saturated colors, thick white outlines, white text, no black outlines, no dark colors">Bright screen print (dark tee)</option>
+                <option data-dark="1" value="white ink illustration made for black t-shirts, white and cream linework only, crosshatching in white, chalky texture, no black lines">White ink sketch (dark tee)</option>
+                <option data-dark="1" value="glowing neon line art illustration, bright neon pink, cyan, yellow and white light lines, glow effect, no black elements">Neon glow (dark tee)</option>
+                <option data-dark="1" value="traditional tattoo flash art made for dark shirts, bright colors with thick white and cream outlines instead of black outlines">Tattoo flash (dark tee)</option>
+                <option data-dark="1" value="vintage distressed retro illustration made for dark shirts, cream, mustard, orange and teal ink, white outlines, faded worn print texture, no black">Vintage distressed (dark tee)</option>
+                <option data-dark="1" value="retro 80s synthwave illustration, glowing hot pink, purple and cyan, sunset and grid, bright colors, no black elements">Synthwave (dark tee)</option>
+                <option data-dark="1" value="chalkboard style hand lettering and illustration in white and pastel chalk, dusty chalk texture, no black">Chalk lettering (dark tee)</option>
+              </optgroup>
+              <optgroup label="Graphic & flat">
+                <option value="vintage retro badge illustration, distressed texture, limited color palette">Vintage badge</option>
+                <option value="bold screen print illustration, thick outlines, 3-4 flat spot colors">Screen print</option>
+                <option value="elegant hand-lettered typography design, decorative script">Typography</option>
+                <option value="flat vector illustration, clean geometric shapes, solid flat colors, no gradients, no texture, limited palette of 5 colors">Flat vector</option>
+                <option value="realistic digital illustration, dramatic lighting, fine detail">Realistic</option>
+                <option value="cute kawaii illustration, soft pastel colors, rounded shapes">Cute kawaii</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
         <div class="field">
-          <label for="product">Product</label>
-          <select id="product">
-            <option value="t-shirt graphic, centered composition">T-shirt</option>
-            <option value="hoodie graphic, bold centered design">Hoodie</option>
-            <option value="mug wrap design, seamless horizontal composition">Mug wrap</option>
-            <option value="die-cut sticker design, thick white border">Sticker</option>
-            <option value="tote bag print design, minimalist composition">Tote bag</option>
-            <option value="phone case graphic, vertical composition">Phone case</option>
+          <label for="niche">Niche</label>
+          <select id="niche"></select>
+        </div>
+
+        <div class="field">
+          <label for="suggest">Idea</label>
+          <select id="suggest"></select>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <label for="idea">Description <span class="hint">(edit freely)</span></label>
+          <input id="idea" type="text">
+        </div>
+
+        <div class="field">
+          <label for="exactText">Text on design <span class="hint">(empty = no text)</span></label>
+          <input id="exactText" type="text" placeholder="e.g. Reel Cool Dad">
+        </div>
+
+        <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
+
+        <div class="field">
+          <label for="vecLevel">Quick vector detail <span class="hint">(for ⬇ Vector SVG / HD PNG buttons)</span></label>
+          <select id="vecLevel">
+            <option value="detailed">Detailed (24 colors, keeps small details)</option>
+            <option value="balanced" selected>Balanced (16 colors, clean lines + detail)</option>
+            <option value="clean">Clean (10 colors, smoothest, best for print)</option>
           </select>
         </div>
-        <div class="field">
-          <label for="style">Style</label>
-          <select id="style">
-            <optgroup label="Artistic (hand-made look)">
-              <option value="hand-drawn pen and ink illustration, expressive confident linework, visible sketch lines, cross-hatching shading, artist sketchbook feel, not cartoon, not clipart">Ink sketch</option>
-              <option value="expressive oil painting, thick impasto brush strokes, rich painterly texture, gallery artwork, not cartoon, not clipart">Oil painting</option>
-              <option value="gouache painting, visible opaque brush strokes, matte hand-painted texture, rich muted colors, not cartoon, not clipart">Gouache</option>
-              <option value="loose watercolor painting, wet-on-wet blooms, visible paper grain, delicate ink outlines, hand-painted, not cartoon, not clipart">Watercolor</option>
-              <option value="linocut block print, bold hand-carved lines, imperfect ink texture, artisan printmaking, 2 ink colors, not cartoon, not clipart">Linocut print</option>
-              <option value="ukiyo-e japanese woodblock print style, flowing hand-carved lines, traditional flat colors, subtle paper texture, not cartoon">Woodblock (ukiyo-e)</option>
-              <option value="charcoal and soft pastel drawing, smudged shading, expressive hand strokes, fine art drawing, not cartoon, not clipart">Charcoal & pastel</option>
-              <option value="dotwork stipple illustration, thousands of fine hand-inked dots, tattoo artist technique, high detail, not cartoon">Dotwork stipple</option>
-              <option value="vintage scientific naturalist illustration, fine engraving lines and stippling, hand-tinted watercolor, 19th century art, not cartoon">Vintage naturalist</option>
-              <option value="classic engraving illustration, fine crosshatching, intricate linework, not cartoon">Engraving</option>
-              <option value="risograph print illustration, grainy ink texture, 2-3 overlapping ink colors, slight misregistration, indie art print, not cartoon">Risograph</option>
-              <option value="american traditional tattoo flash art, bold hand-inked black outlines, limited vintage palette, tattoo artist style">Tattoo flash</option>
-              <option value="fine art digital painting, painterly brushwork, rich detail, not cartoon, not clipart">Fine art painterly</option>
-              <option value="surreal fine art illustration, dreamlike atmosphere, painterly detail, not cartoon">Surreal</option>
-            </optgroup>
-            <optgroup label="Works on light AND dark shirts">
-              <option data-universal="1" value="bold sticker style illustration that works on both white and black t-shirts, mid-tone saturated colors like orange, teal, red and yellow, very thick black outlines around every shape, no pure white areas, no large black areas, flat colors with simple shading">Universal sticker (any tee)</option>
-              <option data-universal="1" value="detailed watercolor clipart illustration in the style of premium autumn sublimation clipart, soft hand-painted watercolor textures, fine delicate details with individual fluffy fur strands, rich warm saturated colors like orange, rust, amber, honey and teal, soft realistic shading, cute and charming, no flat vector, no cartoon, no heavy black outlines, mid-tone colors that look good on both white and black t-shirts">Watercolor clipart (any tee)</option>
-            </optgroup>
-            <optgroup label="For dark shirts (black, red, purple…)">
-              <option data-dark="1" value="bold screen print illustration made for dark t-shirts, bright saturated colors, thick white outlines, white text, no black outlines, no dark colors">Bright screen print (dark tee)</option>
-              <option data-dark="1" value="white ink illustration made for black t-shirts, white and cream linework only, crosshatching in white, chalky texture, no black lines">White ink sketch (dark tee)</option>
-              <option data-dark="1" value="glowing neon line art illustration, bright neon pink, cyan, yellow and white light lines, glow effect, no black elements">Neon glow (dark tee)</option>
-              <option data-dark="1" value="traditional tattoo flash art made for dark shirts, bright colors with thick white and cream outlines instead of black outlines">Tattoo flash (dark tee)</option>
-              <option data-dark="1" value="vintage distressed retro illustration made for dark shirts, cream, mustard, orange and teal ink, white outlines, faded worn print texture, no black">Vintage distressed (dark tee)</option>
-              <option data-dark="1" value="retro 80s synthwave illustration, glowing hot pink, purple and cyan, sunset and grid, bright colors, no black elements">Synthwave (dark tee)</option>
-              <option data-dark="1" value="chalkboard style hand lettering and illustration in white and pastel chalk, dusty chalk texture, no black">Chalk lettering (dark tee)</option>
-            </optgroup>
-            <optgroup label="Graphic & flat">
-              <option value="vintage retro badge illustration, distressed texture, limited color palette">Vintage badge</option>
-              <option value="bold screen print illustration, thick outlines, 3-4 flat spot colors">Screen print</option>
-              <option value="elegant hand-lettered typography design, decorative script">Typography</option>
-              <option value="flat vector illustration, clean geometric shapes, solid flat colors, no gradients, no texture, limited palette of 5 colors">Flat vector</option>
-              <option value="realistic digital illustration, dramatic lighting, fine detail">Realistic</option>
-              <option value="cute kawaii illustration, soft pastel colors, rounded shapes">Cute kawaii</option>
-            </optgroup>
-          </select>
+
+        <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
+
+        <p class="note" style="margin:0 0 8px">Keep text to 1–4 words for clean lettering. Always check spelling before uploading. Each design uses 1 of your daily images.</p>
+        <div class="genwrap">
+          <div class="gen-row">
+            <select id="genCount" aria-label="Designs per click"><option value="2">2 designs</option><option value="4">4 designs</option></select>
+            <button id="genBtn" class="gen" type="button">Generate 2 designs</button>
+          </div>
         </div>
       </div>
 
-      <div class="field">
-        <label for="niche">Niche</label>
-        <select id="niche"></select>
+      <!-- TOOLS -->
+      <div id="paneTools" class="pane">
+        <h3 class="tool-title">Similar image</h3>
+        <p class="note" style="margin:4px 0 12px">Pick an image: the AI describes it generically and draws new, improved designs (use the style in Create). Use only images you have the rights to.</p>
+        <input type="file" id="simFile" accept="image/*" style="display:none">
+        <button id="simPick" class="btn-sec" type="button" style="margin-top:0">📷 Choose image</button>
+        <img id="simThumb" class="sim-thumb" alt="Selected image" hidden>
+        <div class="field" style="margin-top:12px">
+          <label for="simLevel">How different?</label>
+          <select id="simLevel">
+            <option value="close">Very close to the original</option>
+            <option value="mid" selected>Similar, but improved</option>
+            <option value="far">More different</option>
+          </select>
+        </div>
+        <button id="simGo" class="btn-sec" type="button" disabled>✨ Create similar designs</button>
+
+        <div class="divider"></div>
+        <h3 class="tool-title">Concept generator</h3>
+        <p class="note" style="margin:4px 0 12px">10 insider-joke ideas for one niche. Tap "Use" to fill the form.</p>
+        <div class="field">
+          <label for="cPick">Popular niches <span class="hint">(pick one, or type below)</span></label>
+          <select id="cPick"><option value="">— Choose a niche —</option></select>
+        </div>
+        <div class="field">
+          <label for="cNiche">Niche</label>
+          <input id="cNiche" type="text" placeholder="e.g. ER nurses, sourdough bakers, pitbull moms">
+        </div>
+        <div class="field">
+          <label for="cSeason">Season</label>
+          <select id="cSeason">
+            <option value="">None (evergreen)</option>
+            <option>Halloween</option>
+            <option>Thanksgiving</option>
+            <option>Christmas</option>
+            <option>Valentine's Day</option>
+            <option>Mother's Day</option>
+            <option>Father's Day</option>
+            <option>Summer</option>
+            <option>Back to school</option>
+          </select>
+        </div>
+        <button id="cBtn" class="btn-sec" type="button">Generate 10 concepts</button>
+        <div id="concepts"></div>
+
+        <div class="divider"></div>
+        <h3 class="tool-title">Resize design to 6000×6500</h3>
+        <p class="note" style="margin:4px 0 12px">Upload a finished design and download it at exactly 6000×6500 px — kept as-is, no distortion (scaled to fit, centered, any transparency kept). Ready for POD upload.</p>
+        <input type="file" id="rsFile" accept="image/*" style="display:none">
+        <button id="rsPick" class="btn-sec" type="button" style="margin-top:0">📐 Choose design</button>
+        <img id="rsThumb" class="sim-thumb" alt="Selected design" hidden>
+        <button id="rsGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬇ Resize to 6000×6500 & download</button>
+
+        <div class="divider"></div>
+        <h3 class="tool-title">Upscale to high resolution</h3>
+        <p class="note" style="margin:4px 0 12px">Upload a finished design and the AI re-draws it sharper at high resolution — fixes blurry / soft art, keeps your design and transparency. Auto-centered (empty margins trimmed) so it never sits on the side when you upload to TeePublic / Redbubble. (Small images take ~1 min, free in your browser.)</p>
+        <input type="file" id="upFile" accept="image/*" style="display:none">
+        <button id="upPick" class="btn-sec" type="button" style="margin-top:0">🖼 Choose design</button>
+        <img id="upThumb" class="sim-thumb" alt="Selected design" hidden>
+        <button id="upGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬆ Upscale to high res & download</button>
+
+        <div class="divider"></div>
+        <h3 class="tool-title">Remove background</h3>
+        <p class="note" style="margin:4px 0 12px">Upload a design on a solid / flat background and get a clean transparent PNG. Keeps white parts inside the subject. Works best when the background is one flat color with a little margin.</p>
+        <input type="file" id="rbFile" accept="image/*" style="display:none">
+        <button id="rbPick" class="btn-sec" type="button" style="margin-top:0">🧽 Choose design</button>
+        <img id="rbThumb" class="sim-thumb" alt="Selected design" hidden>
+        <div class="field" style="margin-top:12px">
+          <label for="rbTol">Strength: <span id="rbTolV">45</span> <span class="hint">(keeps more ← → removes more)</span></label>
+          <input id="rbTol" type="range" min="10" max="120" value="45">
+        </div>
+        <button id="rbGo" class="btn-sec" type="button" disabled>⬇ Remove background & download</button>
       </div>
-
-      <div class="field">
-        <label for="suggest">Idea</label>
-        <select id="suggest"></select>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="field">
-        <label for="idea">Description <span class="hint">(edit freely)</span></label>
-        <input id="idea" type="text">
-      </div>
-
-      <div class="field">
-        <label for="exactText">Text on design <span class="hint">(empty = no text)</span></label>
-        <input id="exactText" type="text" placeholder="e.g. Reel Cool Dad">
-      </div>
-
-      <label class="check"><input type="checkbox" id="textLater"> <span><strong>Add text myself after</strong> — AI draws the picture only, then use ✏️ Add text for 100% correct spelling</span></label>
-
-      <div class="field">
-        <label for="vecLevel">Quick vector detail <span class="hint">(for ⬇ Vector SVG / HD PNG buttons)</span></label>
-        <select id="vecLevel">
-          <option value="detailed">Detailed (24 colors, keeps small details)</option>
-          <option value="balanced" selected>Balanced (16 colors, clean lines + detail)</option>
-          <option value="clean">Clean (10 colors, smoothest, best for print)</option>
-        </select>
-      </div>
-
-      <button id="saveIdea" class="btn-sec" type="button" style="margin:0 0 12px">Save as my idea</button>
-
-      <button id="genBtn" class="gen">Generate 2 designs</button>
-      <p class="note">Keep text to 1–4 words for clean lettering. Always check spelling before uploading.</p>
-      <style>
-        .tool-title{font-size:17px;margin:0}
-        .concept{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px;background:#FAFBFC}
-        .concept .ct{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:15px}
-        .concept p{margin:4px 0;font-size:13px;color:var(--muted)}
-        .concept p strong{color:var(--ink);font-weight:600}
-        .concept .row{display:flex;gap:6px;margin-top:8px}
-        .concept .row .btn-sec{margin-top:0}
-      </style>
-
-      <div class="divider"></div>
-      <h3 class="tool-title">Similar image</h3>
-      <p class="note" style="margin:4px 0 12px">Pick an image: the AI describes it generically and draws 2 new, improved designs (use the style above). Use only images you have the rights to.</p>
-      <input type="file" id="simFile" accept="image/*" style="display:none">
-      <button id="simPick" class="btn-sec" type="button" style="margin-top:0">📷 Choose image</button>
-      <img id="simThumb" class="sim-thumb" alt="Selected image" hidden>
-      <div class="field" style="margin-top:12px">
-        <label for="simLevel">How different?</label>
-        <select id="simLevel">
-          <option value="close">Very close to the original</option>
-          <option value="mid" selected>Similar, but improved</option>
-          <option value="far">More different</option>
-        </select>
-      </div>
-      <button id="simGo" class="btn-sec" type="button" disabled>✨ Create similar designs</button>
-
-      <div class="divider"></div>
-      <h3 class="tool-title">Concept generator</h3>
-      <p class="note" style="margin:4px 0 12px">10 insider-joke ideas for one niche. Tap "Use" to fill the form.</p>
-      <div class="field">
-        <label for="cPick">Popular niches <span class="hint">(pick one, or type below)</span></label>
-        <select id="cPick"><option value="">— Choose a niche —</option></select>
-      </div>
-      <div class="field">
-        <label for="cNiche">Niche</label>
-        <input id="cNiche" type="text" placeholder="e.g. ER nurses, sourdough bakers, pitbull moms">
-      </div>
-      <div class="field">
-        <label for="cSeason">Season</label>
-        <select id="cSeason">
-          <option value="">None (evergreen)</option>
-          <option>Halloween</option>
-          <option>Thanksgiving</option>
-          <option>Christmas</option>
-          <option>Valentine's Day</option>
-          <option>Mother's Day</option>
-          <option>Father's Day</option>
-          <option>Summer</option>
-          <option>Back to school</option>
-        </select>
-      </div>
-      <button id="cBtn" class="btn-sec" type="button">Generate 10 concepts</button>
-      <div id="concepts"></div>
-
-      <div class="divider"></div>
-      <h3 class="tool-title">Resize design to 6000×6500</h3>
-      <p class="note" style="margin:4px 0 12px">Upload a finished design and download it at exactly 6000×6500 px — kept as-is, no distortion (scaled to fit, centered, any transparency kept). Ready for POD upload.</p>
-      <input type="file" id="rsFile" accept="image/*" style="display:none">
-      <button id="rsPick" class="btn-sec" type="button" style="margin-top:0">📐 Choose design</button>
-      <img id="rsThumb" class="sim-thumb" alt="Selected design" hidden>
-      <button id="rsGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬇ Resize to 6000×6500 & download</button>
-
-      <div class="divider"></div>
-      <h3 class="tool-title">Upscale to high resolution</h3>
-      <p class="note" style="margin:4px 0 12px">Upload a finished design and the AI re-draws it sharper at high resolution — fixes blurry / soft art, keeps your design and transparency. Auto-centered (empty margins trimmed) so it never sits on the side when you upload to TeePublic / Redbubble. (Small images take ~1 min, free in your browser.)</p>
-      <input type="file" id="upFile" accept="image/*" style="display:none">
-      <button id="upPick" class="btn-sec" type="button" style="margin-top:0">🖼 Choose design</button>
-      <img id="upThumb" class="sim-thumb" alt="Selected design" hidden>
-      <button id="upGo" class="btn-sec" type="button" disabled style="margin-top:12px">⬆ Upscale to high res & download</button>
-
-      <div class="divider"></div>
-      <h3 class="tool-title">Remove background</h3>
-      <p class="note" style="margin:4px 0 12px">Upload a design on a solid / flat background and get a clean transparent PNG. Keeps white parts inside the subject. Works best when the background is one flat color with a little margin.</p>
-      <input type="file" id="rbFile" accept="image/*" style="display:none">
-      <button id="rbPick" class="btn-sec" type="button" style="margin-top:0">🧽 Choose design</button>
-      <img id="rbThumb" class="sim-thumb" alt="Selected design" hidden>
-      <div class="field" style="margin-top:12px">
-        <label for="rbTol">Strength: <span id="rbTolV">45</span> <span class="hint">(keeps more ← → removes more)</span></label>
-        <input id="rbTol" type="range" min="10" max="120" value="45">
-      </div>
-      <button id="rbGo" class="btn-sec" type="button" disabled>⬇ Remove background & download</button>
-
     </aside>
 
-    <section>
-      <div class="out-head">
-        <h2>Results</h2>
-        <span id="count"></span>
-      </div>
-      <div id="empty" class="empty">
-        <strong>No designs yet</strong>
-        Choose a niche and an idea, then generate.
-      </div>
-      <div id="results" class="grid"></div>
+    <section class="main">
+      <div class="tabs-seg"><button class="sb on" type="button" data-tab="results">🖼 Results</button><button class="sb" type="button" data-tab="library">📚 Library</button></div>
 
-      <div id="historyWrap" class="history" hidden>
-        <h3>This session</h3>
-        <div id="history" class="hgrid"></div>
+      <!-- RESULTS -->
+      <div id="paneResults" class="pane">
+        <div class="out-head">
+          <h2>Results</h2>
+          <span id="count"></span>
+          <span class="grow"></span>
+          <button id="zipResults" class="btn-sec" type="button">⬇ ZIP</button>
+        </div>
+        <div id="empty" class="empty">
+          <strong>No designs yet</strong>
+          Choose a niche and an idea, then generate.
+        </div>
+        <div id="results" class="grid"></div>
+      </div>
+
+      <!-- LIBRARY -->
+      <div id="paneLibrary" class="pane">
+        <div class="out-head">
+          <h2>Library</h2>
+          <span id="libCount"></span>
+          <span class="grow"></span>
+          <button id="libAll" class="chip on" type="button">All</button>
+          <button id="libFavs" class="chip" type="button">⭐ Favorites</button>
+          <button id="zipLib" class="btn-sec" type="button">⬇ ZIP</button>
+        </div>
+        <div id="libEmpty" class="empty" hidden>
+          <strong>Library is empty</strong>
+          Every design you generate is saved here automatically, even after you refresh.
+        </div>
+        <div id="libGrid" class="grid"></div>
       </div>
     </section>
   </div>
 </main>
+
+<nav class="nav" aria-label="Sections">
+  <button class="nb on" type="button" data-tab="create"><span>✨</span>Create</button>
+  <button class="nb" type="button" data-tab="results"><span>🖼</span>Results<b id="resBadge" hidden>0</b></button>
+  <button class="nb" type="button" data-tab="library"><span>📚</span>Library</button>
+  <button class="nb" type="button" data-tab="tools"><span>🧰</span>Tools</button>
+</nav>
 
 <div id="ed" class="ed" hidden>
   <div class="ed-box">
@@ -466,11 +552,23 @@
   </div>
 </div>
 
-<footer><a href="/api/generate?prompt=apple" target="_blank">Test API</a></footer>
+<!-- Tee mockup preview -->
+<div id="mk" class="ed" hidden>
+  <div class="ed-box">
+    <div class="ed-head"><h3>Mockup preview</h3><button id="mkClose" class="mini" type="button">✕ Close</button></div>
+    <canvas id="mkCanvas" width="800" height="900"></canvas>
+    <div class="field" style="margin-top:12px"><label>Shirt color</label><div class="swatches" id="mkSw"></div></div>
+    <div class="field"><label for="mkSize">Print size</label><input id="mkSize" type="range" min="25" max="90" value="60"></div>
+    <div class="field"><label for="mkY">Position (up / down)</label><input id="mkY" type="range" min="130" max="420" value="200"></div>
+    <button id="mkDl" class="btn-sec" type="button">⬇ Download mockup PNG</button>
+  </div>
+</div>
 
-<script src="/app1.js?v=8"></script>
-<script src="/app2.js?v=8"></script>
-<script src="/app3.js?v=8"></script>
+<footer>PixelForge · personal design studio</footer>
+
+<script src="/app1.js?v=9"></script>
+<script src="/app2.js?v=9"></script>
+<script src="/app3.js?v=9"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -744,6 +842,7 @@
 })();
 </script>
 
+<script src="/app4.js?v=9"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
-                                                                                                                          </html>
+</html>
