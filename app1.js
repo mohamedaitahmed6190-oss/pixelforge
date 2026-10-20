@@ -500,9 +500,14 @@ $('#genBtn').onclick = async () => {
   }
   $('#results').prepend(frag);   // same order as created: design 1 first
   const results = [];
+  window.__pfStop = false;
+  const stopB = $('#stopBtn'); if(stopB) stopB.hidden = false;
   for(let i=0;i<slots.length;i++){
+    if(window.__pfStop){ slots[i].remove(); continue; }   // "Stop": cards that never started disappear
     results.push(await genOne(prompt, slots[i], i, ideaVal, productLabel, styleLabel));
   }
+  if(stopB) stopB.hidden = true;
+  if(window.__pfStop) toast('Stopped');
   generating = false; btn.disabled = false; btn.textContent = genLabel();
   const failed = results.filter(r => !r.ok);
   if(failed.some(r => r.limit)) toast('Daily limit reached — come back tomorrow', true);
@@ -551,7 +556,7 @@ async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
   if(poll) return finishSlot(poll, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);
 
   const limit = !!(w && w.limit);
-  box.innerHTML = `<div class="status err">${limit ? 'Daily limit reached. Come back tomorrow.' : 'Generation failed. Try again in a minute.'}</div>`;
+  box.innerHTML = `<div class="status err">${limit ? 'Daily limit reached. Come back tomorrow.' : 'Generation failed. Try again in a minute.'}</div>` + (limit ? '' : '<button class="btn-sec retryBtn" type="button" data-ic="refresh" style="margin:10px auto 0;width:auto">Retry</button>');
   return { ok:false, limit };
 }
 

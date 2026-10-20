@@ -260,7 +260,7 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&l
 let tt;
 function toast(msg, err){
   clearTimeout(tt); document.querySelectorAll('.toast').forEach(t=>t.remove());
-  const t = document.createElement('div'); t.className = 'toast' + (err?' err':''); t.textContent = msg;
+  const t = document.createElement('div'); t.className = 'toast' + (err?' err':''); t.setAttribute('role', err ? 'alert' : 'status'); t.textContent = msg;
   document.body.appendChild(t); tt = setTimeout(()=>t.remove(), 3500);
 }
 

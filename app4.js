@@ -7,7 +7,7 @@
   const THEME_KEY = 'pf_theme';
   function applyTheme(t){
     document.documentElement.dataset.theme = t;
-    const b = q('#themeBtn'); if(b) b.dataset.ic = t === 'dark' ? 'sun' : 'moon';
+    const b = q('#themeBtn'); if(b){ b.dataset.ic = t === 'dark' ? 'sun' : 'moon'; b.setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'); }
     const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = t === 'dark' ? '#0E0D22' : '#F2F3F7';
   }
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
@@ -31,12 +31,16 @@
       const t = b.dataset.tab;
       const on = b.classList.contains('nb') ? t === tabState.mobile : ((t === tabState.left && tabState.open) || t === tabState.right);
       b.classList.toggle('on', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     if(name === 'library') renderLib();
     if(window.matchMedia('(max-width:900px)').matches) window.scrollTo({ top:0 });
   }
   window.setTab = setTab;
+  // tab semantics for screen readers
+  qa('.tabs-seg').forEach(t => t.setAttribute('role', 'tablist')); q('.nav') && q('.nav').setAttribute('role', 'tablist');
+  qa('.sb,.nb').forEach(b => b.setAttribute('role', 'tab'));
+  qa('.pane').forEach(p => p.setAttribute('role', 'tabpanel'));
   qa('[data-tab]').forEach(b => b.addEventListener('click', () => {
     const t = b.dataset.tab;
     // desktop: the form/tools panel is hidden until Create or Tools is tapped; tapping the active one hides it again
@@ -79,6 +83,19 @@
       return origEdit.call(this, slot);
     };
   })();
+
+  /* ---------- Stop, Retry, Esc-to-close ---------- */
+  q('#stopBtn').addEventListener('click', () => { window.__pfStop = true; q('#stopBtn').hidden = true; });
+  q('#results').addEventListener('click', e => {
+    const b = e.target.closest('.retryBtn'); if(!b) return;
+    const card = b.closest('.card'); if(card) regenSlot(card);
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    const open = [...document.querySelectorAll('.ed:not([hidden])')].pop();
+    const close = open && open.querySelector('#edClose,#vpClose,#mkClose');
+    if(close) close.click();
+  });
 
   /* ---------- number of designs per click (2 or 4) ---------- */
   const gc = q('#genCount');

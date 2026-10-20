@@ -11,7 +11,7 @@
 <script>try{var t=localStorage.getItem('pf_theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Cinzel:wght@800&family=Creepster&family=Fredoka:wght@600&family=Great+Vibes&family=Lobster&family=Luckiest+Guy&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@800&family=Righteous&family=Rye&family=Satisfy&family=Shrikhand&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Cinzel:wght@800&family=Creepster&family=Fredoka:wght@600&family=Great+Vibes&family=Lobster&family=Luckiest+Guy&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@800&family=Righteous&family=Rye&family=Satisfy&family=Shrikhand&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
 <style>
   :root{
@@ -32,6 +32,8 @@
   body{margin:0;font-family:'Instrument Sans',system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5}
   h1,h2,h3{font-family:var(--display);font-stretch:118%;font-weight:800;margin:0;letter-spacing:-.015em}
   button,input,select{font:inherit;color:inherit}
+  .skip{position:absolute;left:-999px;top:8px;background:var(--ink);color:var(--paper);padding:8px 12px;border-radius:8px;z-index:100}
+  .skip:focus{left:8px}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
   .bar{background:var(--paper);color:var(--ink);position:sticky;top:0;z-index:40;transition:box-shadow .2s}
@@ -288,7 +290,8 @@
     <p>Pick a niche, choose an idea, and generate print-ready transparent PNGs for your POD store.</p>
   </div>
 
-  <div class="layout" data-left="create" data-right="results" data-mobile="create">
+  <a class="skip" href="#paneResults">Skip to results</a>
+  <div class="layout" role="main" data-left="create" data-right="results" data-mobile="create">
     <div class="side">
     <div class="tabs-seg"><button class="sb on" type="button" data-tab="create" data-ic="sparkles">Create</button><button class="sb" type="button" data-tab="tools" data-ic="toolbox">Tools</button></div>
     <aside class="panel">
@@ -489,6 +492,7 @@
           <h2>Results</h2>
           <span id="count"></span>
           <span class="grow"></span>
+          <button id="stopBtn" class="btn-sec" type="button" data-ic="x" hidden>Stop</button>
           <button id="zipResults" class="btn-sec" type="button" data-ic="archive">ZIP</button>
         </div>
         <div id="empty" class="empty">
@@ -645,9 +649,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=27"></script>
-<script src="/app2.js?v=27"></script>
-<script src="/app3.js?v=27"></script>
+<script src="/app1.js?v=28"></script>
+<script src="/app2.js?v=28"></script>
+<script src="/app3.js?v=28"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -999,8 +1003,8 @@
 })();
 </script>
 
-<script src="/ipguard.js?v=27"></script>
-<script src="/app4.js?v=27"></script>
+<script src="/ipguard.js?v=28"></script>
+<script src="/app4.js?v=28"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
