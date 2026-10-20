@@ -53,7 +53,9 @@
   .intro p{color:var(--muted);margin:6px 0 0;max-width:60ch}
 
   .layout{display:grid;grid-template-columns:360px 1fr;gap:24px;margin-top:22px;align-items:start}
-  .panel{background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--hard);border-radius:var(--radius-lg);padding:20px;position:sticky;top:76px;max-height:calc(100vh - 92px);overflow-y:auto}
+  .panel{background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--hard);border-radius:var(--radius-lg);padding:20px}
+  .side{min-width:0}
+  @media(min-width:901px){.genwrap{position:sticky;bottom:0;z-index:5;background:var(--surface);padding:12px 0 6px;margin-top:10px;border-top:1px solid var(--line)}}
 
   /* tabs: desktop = two small switchers, mobile = bottom nav */
   .pane{display:none}
@@ -73,7 +75,7 @@
     .layout[data-mobile="tools"] #paneTools,
     .layout[data-mobile="results"] #paneResults,
     .layout[data-mobile="library"] #paneLibrary{display:block}
-    .layout[data-mobile="results"] .panel,.layout[data-mobile="library"] .panel,
+    .layout[data-mobile="results"] .side,.layout[data-mobile="library"] .side,
     .layout[data-mobile="create"] .main,.layout[data-mobile="tools"] .main{display:none}
     .panel{position:static;max-height:none;overflow:visible;padding:16px}
     .tabs-seg{display:none}
@@ -278,8 +280,9 @@
   </div>
 
   <div class="layout" data-left="create" data-right="results" data-mobile="create">
+    <div class="side">
+    <div class="tabs-seg"><button class="sb on" type="button" data-tab="create" data-ic="sparkles">Create</button><button class="sb" type="button" data-tab="tools" data-ic="toolbox">Tools</button></div>
     <aside class="panel">
-      <div class="tabs-seg"><button class="sb on" type="button" data-tab="create" data-ic="sparkles">Create</button><button class="sb" type="button" data-tab="tools" data-ic="toolbox">Tools</button></div>
 
       <!-- CREATE -->
       <div id="paneCreate" class="pane">
@@ -459,6 +462,7 @@
         <button id="rbGo" class="btn-sec" type="button" disabled data-ic="download">Remove background & download</button>
       </div>
     </aside>
+    </div>
 
     <section class="main">
       <div class="tabs-seg"><button class="sb on" type="button" data-tab="results" data-ic="image">Results</button><button class="sb" type="button" data-tab="library" data-ic="layers">Library</button></div>
@@ -625,9 +629,9 @@
 
 <footer>PixelForge · personal design studio</footer>
 
-<script src="/app1.js?v=13"></script>
-<script src="/app2.js?v=13"></script>
-<script src="/app3.js?v=13"></script>
+<script src="/app1.js?v=14"></script>
+<script src="/app2.js?v=14"></script>
+<script src="/app3.js?v=14"></script>
 
 <script>
 /* ---------- Resize a finished design to exactly 6000×6500 (kept as-is, no distortion) ---------- */
@@ -901,7 +905,7 @@
 })();
 </script>
 
-<script src="/app4.js?v=13"></script>
+<script src="/app4.js?v=14"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function(){});</script>
 </body>
 </html>
