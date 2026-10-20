@@ -428,7 +428,10 @@ function buildPrompt(){
     : isUniversal()
     ? `subject isolated on a solid flat vivid saturated hot pink background (#FF1493, not pastel) filling the whole canvas edge to edge, no gradient, no vignette, no shadows, no background scenery; the subject itself contains NO hot pink and NO magenta; the subject stays centered; white parts of the subject (ghost sheets, white fur, teeth, eyes, snow) stay white with a clear thick dark outline, `
     : `subject isolated on a solid plain white background with no shadows and no background scenery; the subject stays centered; NO pure white and NO near-white anywhere INSIDE the subject: every object that is normally white (ghost sheets, white fur, teeth, snow, clouds, paper, bandages) must be painted in a clearly different soft color such as pastel light blue, lavender or warm beige (about #C3D3EA or #D9C8B0) with visible shading, and fully enclosed by a thick dark outline; the ONLY pure white in the whole image is the plain background, `;
-  return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. Style: ${style}. ` +
+  const boost = ($('#wowBoost') && $('#wowBoost').checked)
+    ? `Make it visually striking and scroll-stopping: one bold focal subject, dynamic confident composition, rich intricate detail, strong contrast, premium best-seller quality. `
+    : '';
+  return `${textRule}Create a print-on-demand ${product}. Subject: ${idea}. ${boost}Style: ${style}. ` +
     `Requirements: high contrast, no watermark, clean crisp edges, ` + bg +
     `professional illustration quality. Square 1:1 composition.`;
 }
@@ -539,7 +542,7 @@ async function genOne(prompt, slot, idx, ideaVal, productLabel, styleLabel){
   const box = slot.querySelector('.img-box');
   const dl = slot.querySelector('.dlBtn');
   const seed = Date.now() + idx * 7919;
-  const fullPrompt = `${prompt} (variation ${idx+1}: slightly different composition/colors)`;
+  const fullPrompt = `Variation ${idx+1}, slightly different composition and colors. ${prompt}`;   // first, so the server never cuts it off
 
   const w = await tryWorkersAI(fullPrompt, seed, box);
   if(w && w.url) return finishSlot(w.url, box, dl, idx, prompt, slot, ideaVal, productLabel, styleLabel);

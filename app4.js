@@ -59,6 +59,11 @@
   gc.onchange = () => { try { localStorage.setItem('pf_gen_count', gc.value); } catch(e){} syncGenLabel(); };
   syncGenLabel();
 
+  // Wow boost toggle (on by default, remembered)
+  const wow = q('#wowBoost');
+  try { if(localStorage.getItem('pf_wow') === '0') wow.checked = false; } catch(e){}
+  wow.onchange = () => { try { localStorage.setItem('pf_wow', wow.checked ? '1' : '0'); } catch(e){} };
+
   // the old "This session" strip is replaced by the Library
   window.renderHistory = function(){};
 

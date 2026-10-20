@@ -69,7 +69,7 @@ export async function onRequestGet(context) {
   if (!env.KV) return json({ error: 'KV binding "KV" not configured' }, 500);
 
   const url = new URL(request.url);
-  const prompt = (url.searchParams.get('prompt') || '').slice(0, 800);
+  const prompt = (url.searchParams.get('prompt') || '').slice(0, 1800);
   if (!prompt) return json({ error: 'Missing prompt' }, 400);
 
   const hash = await sha(prompt);
