@@ -317,6 +317,23 @@ function applyIdea(){
   $('#idea').value = d;
   $('#exactText').value = t;
 }
+// move saved ideas between devices (the app and the browser keep separate storage)
+$('#ideasExport').onclick = () => {
+  const o = loadCustom(), n = Object.values(o).reduce((s, l) => s + l.length, 0);
+  if(!n){ toast('No saved ideas on this device yet', true); return; }
+  saveBlob(new Blob([JSON.stringify(o, null, 1)], {type:'application/json'}), 'pixelforge-my-ideas.json'); toast(n + ' ideas exported');
+};
+$('#ideasImport').onclick = () => $('#ideasFile').click();
+$('#ideasFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+  try {
+    const inc = JSON.parse(await f.text()), all = loadCustom(); let added = 0;
+    Object.keys(inc).forEach(k => { if(!Array.isArray(inc[k])) return; const list = all[k] || [];
+      inc[k].forEach(p => { if(Array.isArray(p) && p[0] && !list.some(x => x[0] === p[0] && x[1] === p[1])){ list.push([String(p[0]), String(p[1] || '')]); added++; } });
+      all[k] = list; });
+    saveCustom(all); fillIdeas(); toast(added + ' ideas imported');
+  } catch(err){ toast('That file is not a PixelForge ideas file', true); }
+};
 nicheSel.onchange = () => fillIdeas();
 sugSel.onchange = applyIdea;
 
