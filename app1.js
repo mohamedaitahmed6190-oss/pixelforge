@@ -270,6 +270,7 @@ const NICHES = [
     ['pastel art-deco hotel with neon sign and palm trees','Sunset Strip'],
     ['sports car silhouette with grid horizon and big sun','Midnight Cruiser'] ]}
 ];
+if(window.MORE_NICHES) MORE_NICHES.forEach(n => { if(!NICHES.some(x => x.name === n.name)) NICHES.push(n); });
 if(window.SEASON) SEASON.extend(NICHES);
 
 /* ---------- niche & idea selects (+ your own saved ideas) ---------- */
